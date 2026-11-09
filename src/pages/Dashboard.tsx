@@ -1198,6 +1198,7 @@ function ServicesTab({ services }: { services: SiteService[] }) {
                     <ArrowDown className="size-4" />
                   </Button>
                   <Button
+                    type="button"
                     variant="ghost"
                     size="icon-sm"
                     onClick={() => openEdit(service)}
@@ -1206,6 +1207,7 @@ function ServicesTab({ services }: { services: SiteService[] }) {
                     <Pencil className="size-4" />
                   </Button>
                   <Button
+                    type="button"
                     variant="ghost"
                     size="icon-sm"
                     className="text-destructive hover:text-destructive"
