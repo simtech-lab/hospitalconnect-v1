@@ -57,6 +57,55 @@ const schema = defineSchema(
       updatedAt: v.number(),
     }).index("by_order", ["order"]),
 
+    // Doctors shown in the public "Our team" section.
+    doctors: defineTable({
+      name: v.string(),
+      specialty: v.string(),
+      bio: v.optional(v.string()),
+      photoId: v.optional(v.id("_storage")),
+      photoUrl: v.optional(v.string()),
+      isPublished: v.boolean(),
+      order: v.number(),
+      updatedAt: v.number(),
+    }).index("by_order", ["order"]),
+
+    // Hospital management / leadership profiles.
+    management: defineTable({
+      name: v.string(),
+      role: v.string(),
+      bio: v.optional(v.string()),
+      photoId: v.optional(v.id("_storage")),
+      photoUrl: v.optional(v.string()),
+      isPublished: v.boolean(),
+      order: v.number(),
+      updatedAt: v.number(),
+    }).index("by_order", ["order"]),
+
+    // Upcoming hospital events with a flyer, additional photos and videos.
+    events: defineTable({
+      title: v.string(),
+      description: v.string(),
+      location: v.optional(v.string()),
+      startsAt: v.number(),
+      endsAt: v.optional(v.number()),
+      flyerId: v.optional(v.id("_storage")),
+      flyerUrl: v.optional(v.string()),
+      images: v.array(
+        v.object({
+          storageId: v.optional(v.id("_storage")),
+          url: v.optional(v.string()),
+        }),
+      ),
+      videos: v.array(
+        v.object({
+          storageId: v.optional(v.id("_storage")),
+          url: v.optional(v.string()),
+        }),
+      ),
+      isPublished: v.boolean(),
+      updatedAt: v.number(),
+    }).index("by_starts", ["startsAt"]),
+
     // Single document holding the hospital profile, hours and contact details.
     hospitalInfo: defineTable({
       key: v.literal("main"),

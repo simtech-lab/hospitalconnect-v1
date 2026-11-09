@@ -1,7 +1,9 @@
+import { EventsSection } from "@/components/site/EventsSection";
 import { HeroSlider } from "@/components/site/HeroSlider";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { SiteHeader, type NavItem } from "@/components/site/SiteHeader";
 import { ServiceIcon } from "@/components/site/ServiceIcon";
+import { TeamSection } from "@/components/site/TeamSection";
 import { Button } from "@/components/ui/button";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
@@ -30,6 +32,8 @@ import { Link } from "react-router";
 const SECTION_NAV: NavItem[] = [
   { label: "About", href: "#about" },
   { label: "Services", href: "#services" },
+  { label: "Our team", href: "#team" },
+  { label: "Events", href: "#events" },
   { label: "Visit us", href: "#visit" },
 ];
 
@@ -363,11 +367,19 @@ export default function Landing() {
   const info = site?.info ?? null;
   const slides = site?.slides ?? [];
   const services = site?.services ?? [];
+  const doctors = site?.doctors ?? [];
+  const management = site?.management ?? [];
+  const events = site?.events ?? [];
 
   const name = info?.name?.trim() || DEFAULT_HOSPITAL_NAME;
   const tagline = info?.tagline?.trim() || DEFAULT_TAGLINE;
   const hasInfo = Boolean(info);
-  const hasContent = hasInfo || services.length > 0;
+  const hasContent =
+    hasInfo ||
+    services.length > 0 ||
+    doctors.length > 0 ||
+    management.length > 0 ||
+    events.length > 0;
   const isAdmin = user?.role === "admin";
 
   const navItems: NavItem[] = hasContent ? SECTION_NAV : [];
@@ -457,6 +469,8 @@ export default function Landing() {
 
             <AboutSection info={info} />
             <ServicesSection services={services} />
+            <TeamSection doctors={doctors} management={management} />
+            <EventsSection events={events} />
             <VisitSection info={info} />
           </>
         ) : (
@@ -486,7 +500,7 @@ export default function Landing() {
                 </p>
                 <Button asChild className="mt-5 w-full rounded-full">
                   <Link to={isAdmin ? "/dashboard" : "/auth?returnTo=/dashboard"}>
-                    {isAdmin ? "Open admin console" : "Staff sign in"}
+                    {isAdmin ? "Open admin console" : "Administrator sign in"}
                     <ArrowUpRight className="size-4" />
                   </Link>
                 </Button>
@@ -503,13 +517,13 @@ export default function Landing() {
                 Official information, straight from the hospital.
               </h2>
               <p className="mt-2 max-w-xl text-sm leading-7 text-muted-foreground">
-                Every slide, service and detail on this website is created and
-                published by hospital administration.
+                Every slide, doctor profile, event and service detail on this
+                website is created and published by hospital administration.
               </p>
             </div>
             <Button asChild size="lg" className="shrink-0 rounded-full px-6">
               <Link to={isAdmin ? "/dashboard" : "/auth?returnTo=/dashboard"}>
-                {isAdmin ? "Open admin console" : "Staff sign in"}
+                {isAdmin ? "Open admin console" : "Administrator sign in"}
                 <ArrowRight className="size-4" />
               </Link>
             </Button>

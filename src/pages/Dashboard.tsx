@@ -1,5 +1,8 @@
 import { AdminGate } from "@/components/admin/AdminGate";
+import { DoctorDialog } from "@/components/admin/DoctorDialog";
+import { EventDialog } from "@/components/admin/EventDialog";
 import { HospitalInfoForm } from "@/components/admin/HospitalInfoForm";
+import { ManagementDialog } from "@/components/admin/ManagementDialog";
 import { ServiceDialog } from "@/components/admin/ServiceDialog";
 import { SlideDialog } from "@/components/admin/SlideDialog";
 import { HospitalMark } from "@/components/site/HospitalMark";
@@ -16,6 +19,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Sheet,
   SheetContent,
@@ -28,7 +33,19 @@ import { Switch } from "@/components/ui/switch";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useAuth } from "@/hooks/use-auth";
-import type { AdminSite, SiteService, SiteSlide } from "@/lib/site";
+import {
+  formatEventDateRange,
+  formatEventTimeRange,
+  startOfToday,
+} from "@/lib/date";
+import type {
+  AdminSite,
+  ManagementMember,
+  SiteDoctor,
+  SiteEvent,
+  SiteService,
+  SiteSlide,
+} from "@/lib/site";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery } from "convex/react";
 import { motion } from "framer-motion";
@@ -36,6 +53,7 @@ import {
   ArrowDown,
   ArrowUp,
   Building2,
+  CalendarDays,
   Check,
   Circle,
   Clock,
@@ -45,6 +63,7 @@ import {
   LayoutDashboard,
   Loader2,
   LogOut,
+  Mail,
   MapPin,
   Menu,
   Pencil,
@@ -53,14 +72,26 @@ import {
   Sparkles,
   Stethoscope,
   Trash2,
+  UserPlus,
+  UserRound,
   Users,
+  UsersRound,
+  Video,
   type LucideIcon,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
 
-type Tab = "overview" | "slider" | "info" | "services" | "team";
+type Tab =
+  | "overview"
+  | "slider"
+  | "info"
+  | "services"
+  | "doctors"
+  | "management"
+  | "events"
+  | "team";
 
 const TABS: {
   value: Tab;
@@ -91,6 +122,24 @@ const TABS: {
     label: "Services",
     hint: "Departments shown on the public site",
     icon: Stethoscope,
+  },
+  {
+    value: "doctors",
+    label: "Doctors",
+    hint: "Profiles shown in Our doctors",
+    icon: UserRound,
+  },
+  {
+    value: "management",
+    label: "Management",
+    hint: "Hospital leadership profiles",
+    icon: UsersRound,
+  },
+  {
+    value: "events",
+    label: "Events",
+    hint: "Upcoming events, flyers and media",
+    icon: CalendarDays,
   },
   {
     value: "team",
@@ -143,9 +192,12 @@ function Console({
   const activeTab = TABS.find((item) => item.value === tab) ?? TABS[0];
   const firstName = displayName?.trim().split(/\s+/)[0] ?? "Administrator";
 
-  const counts = {
+  const counts: Partial<Record<Tab, number>> = {
     slider: site?.slides.length,
     services: site?.services.length,
+    doctors: site?.doctors.length,
+    management: site?.management.length,
+    events: site?.events.length,
   };
 
   async function handleSignOut() {
@@ -293,6 +345,11 @@ function Console({
               {tab === "slider" && <SlidesTab slides={site.slides} />}
               {tab === "info" && <InfoTab site={site} />}
               {tab === "services" && <ServicesTab services={site.services} />}
+              {tab === "doctors" && <DoctorsTab doctors={site.doctors} />}
+              {tab === "management" && (
+                <ManagementTab members={site.management} />
+              )}
+              {tab === "events" && <EventsTab events={site.events} />}
               {tab === "team" && <TeamTab />}
             </motion.div>
           )}
@@ -309,18 +366,13 @@ function ConsoleNav({
 }: {
   active: Tab;
   onSelect: (tab: Tab) => void;
-  counts: { slider?: number; services?: number };
+  counts: Partial<Record<Tab, number>>;
 }) {
   return (
     <nav className="flex flex-col gap-1 p-3">
       {TABS.map((item) => {
         const isActive = item.value === active;
-        const count =
-          item.value === "slider"
-            ? counts.slider
-            : item.value === "services"
-              ? counts.services
-              : undefined;
+        const count = counts[item.value];
 
         return (
           <button
@@ -403,6 +455,15 @@ function OverviewTab({
   const publishedServices = site.services.filter(
     (service) => service.isPublished,
   ).length;
+  const publishedDoctors = site.doctors.filter(
+    (doctor) => doctor.isPublished,
+  ).length;
+  const publishedManagement = site.management.filter(
+    (member) => member.isPublished,
+  ).length;
+  const publishedEvents = site.events.filter(
+    (event) => event.isPublished,
+  ).length;
 
   const steps = [
     {
@@ -423,11 +484,26 @@ function OverviewTab({
       done: publishedServices > 0,
       tab: "services" as Tab,
     },
+    {
+      label: "Publish a doctor profile",
+      detail: "Give patients a name and specialty to look for.",
+      done: publishedDoctors > 0,
+      tab: "doctors" as Tab,
+    },
+    {
+      label: "Add an upcoming event",
+      detail: "Outreach, screenings and community programmes.",
+      done: publishedEvents > 0,
+      tab: "events" as Tab,
+    },
   ];
   const completed = steps.filter((step) => step.done).length;
   const showStarter =
     site.slides.length === 0 ||
     site.services.length === 0 ||
+    site.doctors.length === 0 ||
+    site.management.length === 0 ||
+    site.events.length === 0 ||
     info === null;
 
   async function handleSeed() {
@@ -435,7 +511,7 @@ function OverviewTab({
     try {
       const created = await publishStarterContent({});
       toast.success("Starter content published.", {
-        description: `${created.slides} banners and ${created.services} services were added. Edit anything you like.`,
+        description: `${created.slides} banners, ${created.services} services, ${created.doctors} doctors, ${created.management} management profiles and ${created.events} events were added. Edit anything you like.`,
       });
     } catch (error) {
       toast.error(
@@ -461,7 +537,7 @@ function OverviewTab({
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard
           label="Slider banners"
           value={
@@ -503,6 +579,48 @@ function OverviewTab({
           icon={Stethoscope}
           onClick={() => onTab("services")}
         />
+        <StatCard
+          label="Doctors"
+          value={
+            <>
+              {publishedDoctors}
+              <span className="text-xl text-muted-foreground">
+                /{site.doctors.length}
+              </span>
+            </>
+          }
+          note={`${publishedDoctors} published in Our doctors`}
+          icon={UserRound}
+          onClick={() => onTab("doctors")}
+        />
+        <StatCard
+          label="Management"
+          value={
+            <>
+              {publishedManagement}
+              <span className="text-xl text-muted-foreground">
+                /{site.management.length}
+              </span>
+            </>
+          }
+          note={`${publishedManagement} published leadership profiles`}
+          icon={UsersRound}
+          onClick={() => onTab("management")}
+        />
+        <StatCard
+          label="Events"
+          value={
+            <>
+              {publishedEvents}
+              <span className="text-xl text-muted-foreground">
+                /{site.events.length}
+              </span>
+            </>
+          }
+          note={`${publishedEvents} published events`}
+          icon={CalendarDays}
+          onClick={() => onTab("events")}
+        />
       </div>
 
       {showStarter && (
@@ -513,9 +631,10 @@ function OverviewTab({
               Need a head start?
             </p>
             <p className="mt-1.5 max-w-xl text-xs leading-6 text-muted-foreground">
-              Publish editable starter content — a hospital profile, three
-              homepage banners and six services. Replace any wording, image or
-              number with your hospital&apos;s own before sharing the site.
+              Publish editable starter content — a hospital profile, homepage
+              banners, services, doctor and management profiles and sample
+              events. Replace any wording, image or number with your
+              hospital&apos;s own before sharing the site.
             </p>
           </div>
           <Button onClick={handleSeed} disabled={seeding} className="shrink-0">
@@ -1137,6 +1256,665 @@ function ServicesTab({ services }: { services: SiteService[] }) {
   );
 }
 
+function PersonRow({
+  photo,
+  name,
+  subtitle,
+  bio,
+  index,
+  total,
+  isPublished,
+  onToggle,
+  onMove,
+  onEdit,
+  onDelete,
+}: {
+  photo: string | null;
+  name: string;
+  subtitle: string;
+  bio?: string;
+  index: number;
+  total: number;
+  isPublished: boolean;
+  onToggle: (isPublished: boolean) => void;
+  onMove: (direction: -1 | 1) => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <li className="flex flex-col gap-4 rounded-2xl border border-border/80 bg-card p-4 sm:flex-row sm:items-center">
+      <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-muted sm:w-20 sm:shrink-0">
+        {photo ? (
+          <img src={photo} alt="" className="size-full object-cover" />
+        ) : (
+          <div className="grid size-full place-items-center text-muted-foreground">
+            <UserRound className="size-5" />
+          </div>
+        )}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge
+            variant={isPublished ? "default" : "secondary"}
+            className="rounded-full text-[10px]"
+          >
+            {isPublished ? "Live" : "Draft"}
+          </Badge>
+          <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+            Position {index + 1}
+          </span>
+        </div>
+        <p className="mt-1.5 font-display text-xl tracking-tight">{name}</p>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
+          {subtitle}
+        </p>
+        {bio && (
+          <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+            {bio}
+          </p>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-end">
+        <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+          Published
+          <Switch
+            checked={isPublished}
+            onCheckedChange={onToggle}
+            aria-label={`Publish ${name}`}
+          />
+        </label>
+        <div className="flex items-center gap-0.5">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            disabled={index === 0}
+            onClick={() => onMove(-1)}
+            aria-label={`Move ${name} up`}
+          >
+            <ArrowUp className="size-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            disabled={index === total - 1}
+            onClick={() => onMove(1)}
+            aria-label={`Move ${name} down`}
+          >
+            <ArrowDown className="size-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={onEdit}
+            aria-label={`Edit ${name}`}
+          >
+            <Pencil className="size-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="text-destructive hover:text-destructive"
+            onClick={onDelete}
+            aria-label={`Delete ${name}`}
+          >
+            <Trash2 className="size-4" />
+          </Button>
+        </div>
+      </div>
+    </li>
+  );
+}
+
+function DoctorsTab({ doctors }: { doctors: SiteDoctor[] }) {
+  const updateDoctor = useMutation(api.content.updateDoctor);
+  const deleteDoctor = useMutation(api.content.deleteDoctor);
+  const reorderDoctors = useMutation(api.content.reorderDoctors);
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<SiteDoctor | null>(null);
+  const [deleting, setDeleting] = useState<SiteDoctor | null>(null);
+
+  function openNew() {
+    setEditing(null);
+    setDialogOpen(true);
+  }
+
+  function openEdit(doctor: SiteDoctor) {
+    setEditing(doctor);
+    setDialogOpen(true);
+  }
+
+  async function togglePublished(doctor: SiteDoctor, isPublished: boolean) {
+    try {
+      await updateDoctor({ id: doctor._id, isPublished });
+      toast.success(
+        isPublished
+          ? "Doctor published to the website."
+          : "Doctor moved to drafts.",
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not update this doctor.",
+      );
+    }
+  }
+
+  async function move(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= doctors.length) return;
+    const next = [...doctors];
+    const current = next[index];
+    next[index] = next[target];
+    next[target] = current;
+    try {
+      await reorderDoctors({ ids: next.map((doctor) => doctor._id) });
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not reorder doctors.",
+      );
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleting) return;
+    try {
+      await deleteDoctor({ id: deleting._id });
+      toast.success("Doctor profile deleted.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not delete this doctor.",
+      );
+    } finally {
+      setDeleting(null);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="font-display text-3xl tracking-tight sm:text-4xl">
+            Doctors
+          </h1>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+            Add the doctors patients should know about, with their specialty and
+            a profile picture. Use the arrows to set the order on the website.
+          </p>
+        </div>
+        <Button onClick={openNew} className="shrink-0">
+          <Plus className="size-4" />
+          Add doctor
+        </Button>
+      </div>
+
+      {doctors.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center">
+          <span className="mx-auto grid size-12 place-items-center rounded-full bg-secondary text-primary">
+            <UserRound className="size-5" />
+          </span>
+          <p className="mt-4 font-display text-2xl tracking-tight">
+            No doctors added yet
+          </p>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+            Create a profile with a name, specialty and portrait, then publish it
+            to the public website.
+          </p>
+          <Button onClick={openNew} className="mt-5">
+            <Plus className="size-4" />
+            Add the first doctor
+          </Button>
+        </div>
+      ) : (
+        <ul className="space-y-3">
+          {doctors.map((doctor, index) => (
+            <PersonRow
+              key={doctor._id}
+              photo={doctor.photo}
+              name={doctor.name}
+              subtitle={doctor.specialty}
+              bio={doctor.bio}
+              index={index}
+              total={doctors.length}
+              isPublished={doctor.isPublished}
+              onToggle={(checked) => togglePublished(doctor, checked)}
+              onMove={(direction) => move(index, direction)}
+              onEdit={() => openEdit(doctor)}
+              onDelete={() => setDeleting(doctor)}
+            />
+          ))}
+        </ul>
+      )}
+
+      <DoctorDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        doctor={editing}
+      />
+
+      <AlertDialog
+        open={deleting !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleting(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this doctor profile?</AlertDialogTitle>
+            <AlertDialogDescription>
+              “{deleting?.name}” will be removed from the public website and the
+              console. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep profile</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              Delete profile
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+function ManagementTab({ members }: { members: ManagementMember[] }) {
+  const updateMember = useMutation(api.content.updateManagementMember);
+  const deleteMember = useMutation(api.content.deleteManagementMember);
+  const reorderMembers = useMutation(api.content.reorderManagement);
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<ManagementMember | null>(null);
+  const [deleting, setDeleting] = useState<ManagementMember | null>(null);
+
+  function openNew() {
+    setEditing(null);
+    setDialogOpen(true);
+  }
+
+  function openEdit(member: ManagementMember) {
+    setEditing(member);
+    setDialogOpen(true);
+  }
+
+  async function togglePublished(
+    member: ManagementMember,
+    isPublished: boolean,
+  ) {
+    try {
+      await updateMember({ id: member._id, isPublished });
+      toast.success(
+        isPublished
+          ? "Management profile published to the website."
+          : "Management profile moved to drafts.",
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not update this profile.",
+      );
+    }
+  }
+
+  async function move(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= members.length) return;
+    const next = [...members];
+    const current = next[index];
+    next[index] = next[target];
+    next[target] = current;
+    try {
+      await reorderMembers({ ids: next.map((member) => member._id) });
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not reorder management profiles.",
+      );
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleting) return;
+    try {
+      await deleteMember({ id: deleting._id });
+      toast.success("Management profile deleted.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not delete this profile.",
+      );
+    } finally {
+      setDeleting(null);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="font-display text-3xl tracking-tight sm:text-4xl">
+            Management
+          </h1>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+            The leadership team shown on the public website, with their roles and
+            portraits. Publish each profile when it is ready.
+          </p>
+        </div>
+        <Button onClick={openNew} className="shrink-0">
+          <Plus className="size-4" />
+          Add member
+        </Button>
+      </div>
+
+      {members.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center">
+          <span className="mx-auto grid size-12 place-items-center rounded-full bg-secondary text-primary">
+            <UsersRound className="size-5" />
+          </span>
+          <p className="mt-4 font-display text-2xl tracking-tight">
+            No management profiles yet
+          </p>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+            Add the hospital administrator, medical director and other leadership
+            roles for the public website.
+          </p>
+          <Button onClick={openNew} className="mt-5">
+            <Plus className="size-4" />
+            Add the first member
+          </Button>
+        </div>
+      ) : (
+        <ul className="space-y-3">
+          {members.map((member, index) => (
+            <PersonRow
+              key={member._id}
+              photo={member.photo}
+              name={member.name}
+              subtitle={member.role}
+              bio={member.bio}
+              index={index}
+              total={members.length}
+              isPublished={member.isPublished}
+              onToggle={(checked) => togglePublished(member, checked)}
+              onMove={(direction) => move(index, direction)}
+              onEdit={() => openEdit(member)}
+              onDelete={() => setDeleting(member)}
+            />
+          ))}
+        </ul>
+      )}
+
+      <ManagementDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        member={editing}
+      />
+
+      <AlertDialog
+        open={deleting !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleting(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this management profile?</AlertDialogTitle>
+            <AlertDialogDescription>
+              “{deleting?.name}” will be removed from the public website and the
+              console. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep profile</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              Delete profile
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+function EventsTab({ events }: { events: SiteEvent[] }) {
+  const updateEvent = useMutation(api.content.updateEvent);
+  const deleteEvent = useMutation(api.content.deleteEvent);
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<SiteEvent | null>(null);
+  const [deleting, setDeleting] = useState<SiteEvent | null>(null);
+  const today = startOfToday();
+
+  const ordered = useMemo(
+    () =>
+      [...events].sort((a, b) => {
+        const aUpcoming = a.startsAt >= today;
+        const bUpcoming = b.startsAt >= today;
+        if (aUpcoming !== bUpcoming) return aUpcoming ? -1 : 1;
+        return aUpcoming ? a.startsAt - b.startsAt : b.startsAt - a.startsAt;
+      }),
+    [events, today],
+  );
+
+  function openNew() {
+    setEditing(null);
+    setDialogOpen(true);
+  }
+
+  function openEdit(event: SiteEvent) {
+    setEditing(event);
+    setDialogOpen(true);
+  }
+
+  async function togglePublished(event: SiteEvent, isPublished: boolean) {
+    try {
+      await updateEvent({ id: event._id, isPublished });
+      toast.success(
+        isPublished ? "Event published to the website." : "Event moved to drafts.",
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not update this event.",
+      );
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleting) return;
+    try {
+      await deleteEvent({ id: deleting._id });
+      toast.success("Event deleted.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not delete this event.",
+      );
+    } finally {
+      setDeleting(null);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="font-display text-3xl tracking-tight sm:text-4xl">
+            Upcoming events
+          </h1>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+            Create events with a flyer, photo gallery and videos. Published
+            events appear in the “Upcoming events” section of the public site.
+          </p>
+        </div>
+        <Button onClick={openNew} className="shrink-0">
+          <Plus className="size-4" />
+          Create event
+        </Button>
+      </div>
+
+      {ordered.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center">
+          <span className="mx-auto grid size-12 place-items-center rounded-full bg-secondary text-primary">
+            <CalendarDays className="size-5" />
+          </span>
+          <p className="mt-4 font-display text-2xl tracking-tight">
+            No events yet
+          </p>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+            Add screenings, outreach programmes and open days so the community
+            knows what is coming up.
+          </p>
+          <Button onClick={openNew} className="mt-5">
+            <Plus className="size-4" />
+            Create the first event
+          </Button>
+        </div>
+      ) : (
+        <ul className="space-y-3">
+          {ordered.map((event) => {
+            const isPast = (event.endsAt ?? event.startsAt) < today;
+
+            return (
+              <li
+                key={event._id}
+                className="rounded-2xl border border-border/80 bg-card p-4"
+              >
+                <div className="flex flex-col gap-4 sm:flex-row">
+                  <div className="relative aspect-[16/9] w-full overflow-hidden rounded-xl bg-muted sm:aspect-square sm:w-28 sm:shrink-0">
+                    {event.flyer ? (
+                      <img
+                        src={event.flyer}
+                        alt=""
+                        className="size-full object-cover"
+                      />
+                    ) : (
+                      <div className="grid size-full place-items-center text-muted-foreground">
+                        <CalendarDays className="size-5" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge
+                        variant={event.isPublished ? "default" : "secondary"}
+                        className="rounded-full text-[10px]"
+                      >
+                        {event.isPublished ? "Live" : "Draft"}
+                      </Badge>
+                      <Badge
+                        variant="outline"
+                        className="rounded-full text-[10px]"
+                      >
+                        {isPast ? "Past" : "Upcoming"}
+                      </Badge>
+                    </div>
+                    <p className="mt-1.5 font-display text-xl tracking-tight">
+                      {event.title}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatEventDateRange(event.startsAt, event.endsAt)} ·{" "}
+                      {formatEventTimeRange(event.startsAt, event.endsAt)}
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {event.location || "No location set"}
+                    </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-4 text-[11px] text-muted-foreground">
+                      <span className="inline-flex items-center gap-1">
+                        <Images className="size-3.5" />
+                        {event.images.length}{" "}
+                        {event.images.length === 1 ? "photo" : "photos"}
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <Video className="size-3.5" />
+                        {event.videos.length}{" "}
+                        {event.videos.length === 1 ? "video" : "videos"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-end">
+                    <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                      Published
+                      <Switch
+                        checked={event.isPublished}
+                        onCheckedChange={(checked) =>
+                          togglePublished(event, checked)
+                        }
+                        aria-label={`Publish ${event.title}`}
+                      />
+                    </label>
+                    <div className="flex items-center gap-0.5">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => openEdit(event)}
+                        aria-label={`Edit ${event.title}`}
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => setDeleting(event)}
+                        aria-label={`Delete ${event.title}`}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      <EventDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        event={editing}
+      />
+
+      <AlertDialog
+        open={deleting !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleting(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this event?</AlertDialogTitle>
+            <AlertDialogDescription>
+              “{deleting?.title}” and its flyer, photos and videos will be
+              removed. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep event</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              Delete event
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
 function InfoTab({ site }: { site: AdminSite }) {
   return (
     <div className="space-y-5">
@@ -1159,11 +1937,55 @@ function TeamTab() {
   const { user } = useAuth();
   const team = useQuery(api.admins.listTeam);
   const setRole = useMutation(api.admins.setRole);
+  const inviteAdmin = useMutation(api.admins.inviteAdmin);
+
+  const [inviteName, setInviteName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviting, setInviting] = useState(false);
 
   const admins = useMemo(
     () => team?.filter((member) => member.role === "admin").length ?? 0,
     [team],
   );
+
+  async function handleInvite(event: React.FormEvent) {
+    event.preventDefault();
+    if (!inviteEmail.trim()) {
+      toast.error("Enter the administrator's email address.");
+      return;
+    }
+
+    setInviting(true);
+    try {
+      const result = await inviteAdmin({
+        name: inviteName.trim(),
+        email: inviteEmail.trim(),
+      });
+      if (result.wasAdmin) {
+        toast.info("That email already has administrator access.");
+      } else if (result.created) {
+        toast.success("Administrator invited.", {
+          description: `They can now sign in with a one-time code sent to ${inviteEmail
+            .trim()
+            .toLowerCase()}.`,
+        });
+      } else {
+        toast.success("Administrator access granted.", {
+          description: "They can now sign in with their existing account.",
+        });
+      }
+      setInviteName("");
+      setInviteEmail("");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not invite this administrator.",
+      );
+    } finally {
+      setInviting(false);
+    }
+  }
 
   async function changeRole(userId: Id<"users">, role: "admin" | "user") {
     try {
@@ -1187,10 +2009,65 @@ function TeamTab() {
           Team access
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-          Only administrators can create or publish website content. Grant
-          access to colleagues who should help manage the site.
+          Only administrators can sign in and create or publish website content.
+          Invite colleagues by email and give them access to the console.
         </p>
       </div>
+
+      <form
+        onSubmit={handleInvite}
+        className="rounded-2xl border border-border/80 bg-card p-5"
+      >
+        <div className="flex items-start gap-3">
+          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-secondary text-primary">
+            <UserPlus className="size-5" />
+          </span>
+          <div>
+            <p className="text-sm font-semibold">Invite another administrator</p>
+            <p className="mt-0.5 max-w-xl text-xs leading-5 text-muted-foreground">
+              The invited person signs in with a one-time code sent to this
+              email. They can create and publish content immediately.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_1.25fr_auto] sm:items-end">
+          <div className="space-y-1.5">
+            <Label htmlFor="invite-name">Name</Label>
+            <Input
+              id="invite-name"
+              value={inviteName}
+              placeholder="Full name"
+              onChange={(event) => setInviteName(event.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="invite-email">
+              Email <span className="text-destructive">*</span>
+            </Label>
+            <div className="relative">
+              <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="invite-email"
+                type="email"
+                value={inviteEmail}
+                placeholder="colleague@hospital.org"
+                className="pl-9"
+                onChange={(event) => setInviteEmail(event.target.value)}
+                required
+              />
+            </div>
+          </div>
+          <Button type="submit" disabled={inviting}>
+            {inviting ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <UserPlus className="size-4" />
+            )}
+            Add administrator
+          </Button>
+        </div>
+      </form>
 
       {!team ? (
         <div className="flex items-center gap-3 rounded-2xl border bg-card p-6 text-sm text-muted-foreground">
@@ -1235,6 +2112,9 @@ function TeamTab() {
                       </p>
                       <p className="truncate text-xs text-muted-foreground">
                         {member.email || "No email on this account"}
+                        {!member.hasSignedIn &&
+                          member.role === "admin" &&
+                          " · Invitation pending"}
                       </p>
                     </div>
                   </div>
@@ -1273,12 +2153,12 @@ function TeamTab() {
       )}
 
       <p className="text-xs leading-6 text-muted-foreground">
-        Colleagues appear here after signing in to the website once. To invite
-        someone new, share the website link and ask them to sign in at{" "}
+        Only the email addresses listed as administrators can sign in at{" "}
         <Link to="/auth" className="text-primary underline-offset-4 hover:underline">
           /auth
         </Link>
-        . They can then be granted administrator access from this panel.
+        . Revoking access keeps the account record but blocks that person from
+        the console.
       </p>
     </div>
   );

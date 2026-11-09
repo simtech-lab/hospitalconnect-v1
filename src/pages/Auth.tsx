@@ -15,7 +15,9 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 import { Label } from "@/components/ui/label";
+import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
+import { useConvex, useQuery } from "convex/react";
 import { ArrowLeft, ArrowRight, Check, Loader2, Mail } from "lucide-react";
 import { Suspense, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
@@ -36,6 +38,8 @@ function resolveRedirectAfterAuth(
 
 function Auth({ redirectAfterAuth }: AuthProps = {}) {
   const { isLoading: authLoading, isAuthenticated, signIn } = useAuth();
+  const convex = useConvex();
+  const hasAdmin = useQuery(api.admins.hasAdmin);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const redirect = resolveRedirectAfterAuth(
@@ -59,8 +63,22 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
     setError(null);
     try {
       const formData = new FormData(event.currentTarget);
+      const email = String(formData.get("email") ?? "")
+        .trim()
+        .toLowerCase();
+      formData.set("email", email);
+
+      const access = await convex.query(api.admins.canSignIn, { email });
+      if (!access.allowed) {
+        setError(
+          "This website is managed by hospital administrators. Only registered administrator emails can sign in.",
+        );
+        setIsLoading(false);
+        return;
+      }
+
       await signIn("email-otp", formData);
-      setStep({ email: formData.get("email") as string });
+      setStep({ email });
       setIsLoading(false);
     } catch (error) {
       console.error("Email sign-in error:", error);
@@ -86,23 +104,6 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
       setError("The verification code you entered is incorrect.");
       setIsLoading(false);
       setOtp("");
-    }
-  };
-
-  const handleGuestLogin = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      await signIn("anonymous");
-      navigate(redirect);
-    } catch (error) {
-      console.error("Guest login error:", error);
-      setError(
-        error instanceof Error
-          ? `Failed to sign in: ${error.message}`
-          : "Failed to sign in. Please try again.",
-      );
-      setIsLoading(false);
     }
   };
 
@@ -135,8 +136,8 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
             Publish the hospital&apos;s official website.
           </h1>
           <p className="mt-5 text-sm leading-7 text-primary-foreground/70">
-            Hospital staff sign in here to create and publish the content that
-            appears on the public site.
+            Hospital administrators sign in here to create and publish the
+            content that appears on the public site.
           </p>
 
           <ul className="mt-9 space-y-4 text-sm text-primary-foreground/85">
@@ -152,6 +153,14 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
               {
                 title: "Services & departments",
                 detail: "The care areas shown to patients and partners.",
+              },
+              {
+                title: "Doctors & management",
+                detail: "Profiles of the team patients will meet.",
+              },
+              {
+                title: "Upcoming events",
+                detail: "Flyers, photo galleries and videos.",
               },
             ].map((item) => (
               <li key={item.title} className="flex items-start gap-3">
@@ -172,7 +181,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
         </div>
 
         <div className="relative flex items-center justify-between gap-4 text-[11px] text-primary-foreground/55">
-          <span>Authorised staff only</span>
+          <span>Authorised administrators only</span>
           <Link
             to="/"
             className="inline-flex items-center gap-1.5 transition-colors hover:text-primary-foreground"
@@ -201,13 +210,13 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
 
         <main className="flex flex-1 items-center justify-center px-5 py-10 sm:px-8">
           <div className="w-full max-w-md">
-            <span className="eyebrow">Staff access</span>
+            <span className="eyebrow">Administrator access</span>
             <h2 className="mt-2 font-display text-4xl tracking-tight">
               Administrator sign in
             </h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Use the email registered with hospital administration. We&apos;ll
-              send a one-time code.
+              Only email addresses registered as hospital administrators can
+              sign in. We&apos;ll send a one-time code to yours.
             </p>
 
             <Card className="mt-7 gap-0 border-border/80 py-0 shadow-none">
@@ -250,26 +259,10 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                       Send sign-in code
                     </Button>
 
-                    <div className="my-5 flex items-center gap-3">
-                      <span className="h-px flex-1 bg-border" />
-                      <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                        Or
-                      </span>
-                      <span className="h-px flex-1 bg-border" />
-                    </div>
-
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="w-full text-muted-foreground"
-                      onClick={handleGuestLogin}
-                      disabled={isLoading}
-                    >
-                      Continue with a guest session
-                    </Button>
-                    <p className="mt-1 text-center text-[11px] leading-5 text-muted-foreground/80">
-                      Guest sessions are for first-time setup when email delivery
-                      is unavailable.
+                    <p className="mt-3 text-center text-[11px] leading-5 text-muted-foreground/80">
+                      {hasAdmin === false
+                        ? "No administrator exists yet. The first person to sign in can claim administrator access."
+                        : "New administrators are invited by an existing administrator from the console."}
                     </p>
                   </CardContent>
                 </form>
@@ -366,7 +359,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
             </Card>
 
             <p className="mt-5 text-center text-xs text-muted-foreground">
-              Only administrators can publish content.{" "}
+              Only administrators can sign in and publish content.{" "}
               <Link
                 to="/"
                 className="text-primary underline-offset-4 hover:underline"

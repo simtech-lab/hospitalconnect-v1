@@ -62,6 +62,22 @@ export function SiteFooter({
               </li>
               <li>
                 <a
+                  href={sectionHref("#team")}
+                  className="transition-colors hover:text-primary"
+                >
+                  Doctors & management
+                </a>
+              </li>
+              <li>
+                <a
+                  href={sectionHref("#events")}
+                  className="transition-colors hover:text-primary"
+                >
+                  Upcoming events
+                </a>
+              </li>
+              <li>
+                <a
                   href={sectionHref("#visit")}
                   className="transition-colors hover:text-primary"
                 >
@@ -73,7 +89,7 @@ export function SiteFooter({
                   to="/auth?returnTo=/dashboard"
                   className="inline-flex items-center gap-1 transition-colors hover:text-primary"
                 >
-                  Staff & admin sign in
+                  Administrator sign in
                   <ArrowUpRight className="size-3.5" />
                 </Link>
               </li>

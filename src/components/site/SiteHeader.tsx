@@ -76,12 +76,12 @@ export function SiteHeader({
             </span>
           </Link>
 
-          <nav className="hidden items-center gap-8 md:flex">
+          <nav className="hidden items-center gap-7 lg:flex">
             {navItems.map((item) => (
               <a
                 key={item.href}
                 href={item.href}
-                className="text-[13px] font-medium text-foreground/65 transition-colors hover:text-primary"
+                className="text-[15px] font-medium text-foreground/70 transition-colors hover:text-primary"
               >
                 {item.label}
               </a>
@@ -93,10 +93,10 @@ export function SiteHeader({
               asChild
               variant="outline"
               size="sm"
-              className="hidden h-9 rounded-full border-primary/25 px-4 text-[13px] md:inline-flex"
+              className="hidden h-9 rounded-full border-primary/25 px-4 text-[13px] lg:inline-flex"
             >
               <Link to={isAdmin ? "/dashboard" : "/auth?returnTo=/dashboard"}>
-                {isAdmin ? "Admin console" : "Staff sign in"}
+                {isAdmin ? "Admin console" : "Administrator sign in"}
                 <ArrowUpRight className="size-3.5" />
               </Link>
             </Button>
@@ -106,7 +106,7 @@ export function SiteHeader({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="size-10 md:hidden"
+                  className="size-10 lg:hidden"
                   aria-label="Open menu"
                 >
                   <Menu className="size-5" />
@@ -146,7 +146,7 @@ export function SiteHeader({
                 <div className="mt-auto space-y-3 border-t p-6">
                   <Button asChild className="w-full rounded-full">
                     <Link to={isAdmin ? "/dashboard" : "/auth?returnTo=/dashboard"}>
-                      {isAdmin ? "Open admin console" : "Staff & admin sign in"}
+                      {isAdmin ? "Open admin console" : "Administrator sign in"}
                       <ArrowUpRight className="size-4" />
                     </Link>
                   </Button>

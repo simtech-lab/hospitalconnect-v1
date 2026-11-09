@@ -93,7 +93,7 @@ export function AdminGate() {
                   <p className="text-sm leading-7 text-muted-foreground">
                     No administrator has been set up for this website yet. Claim
                     the first administrator account to start publishing the
-                    homepage slider and hospital information.
+                    hospital website.
                   </p>
                   <Button
                     className="mt-5 w-full"
@@ -107,9 +107,9 @@ export function AdminGate() {
               ) : (
                 <>
                   <p className="text-sm leading-7 text-muted-foreground">
-                    This account does not have administrator access. Ask an
-                    existing administrator to grant you access from the Team
-                    access panel.
+                    This account does not have administrator access. Only
+                    administrators can use the console. Ask hospital
+                    administration to grant your account access.
                   </p>
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Button asChild className="flex-1">

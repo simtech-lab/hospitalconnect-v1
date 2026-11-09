@@ -27,6 +27,76 @@ async function servicesInOrder(ctx: QueryCtx) {
   return await ctx.db.query("services").withIndex("by_order").collect();
 }
 
+const mediaItemValidator = v.object({
+  storageId: v.optional(v.string()),
+  url: v.optional(v.string()),
+});
+
+/** Resolve an uploaded profile photo, falling back to a pasted URL. */
+async function profilePhoto(
+  ctx: QueryCtx,
+  photoId: Id<"_storage"> | undefined,
+  photoUrl: string | undefined,
+) {
+  const uploaded = photoId ? await ctx.storage.getUrl(photoId) : null;
+  return uploaded ?? photoUrl ?? null;
+}
+
+/** Attach resolved URLs to an event's flyer and media library. */
+async function eventWithMedia(ctx: QueryCtx, event: Doc<"events">) {
+  const uploadedFlyer = event.flyerId
+    ? await ctx.storage.getUrl(event.flyerId)
+    : null;
+
+  const images = await Promise.all(
+    event.images.map(async (item) => ({
+      ...item,
+      preview:
+        (item.storageId ? await ctx.storage.getUrl(item.storageId) : null) ??
+        item.url ??
+        "",
+    })),
+  );
+
+  const videos = await Promise.all(
+    event.videos.map(async (item) => ({
+      ...item,
+      preview:
+        (item.storageId ? await ctx.storage.getUrl(item.storageId) : null) ??
+        item.url ??
+        "",
+    })),
+  );
+
+  return {
+    ...event,
+    flyer: uploadedFlyer ?? event.flyerUrl ?? null,
+    images,
+    videos,
+  };
+}
+
+function mediaInput(
+  items: { storageId?: string; url?: string }[],
+): { storageId?: Id<"_storage">; url?: string }[] {
+  return items
+    .map((item) => ({
+      storageId: item.storageId
+        ? (item.storageId as Id<"_storage">)
+        : undefined,
+      url: item.url?.trim() || undefined,
+    }))
+    .filter((item) => item.storageId || item.url);
+}
+
+async function deleteStorageFile(
+  ctx: MutationCtx,
+  storageId: Id<"_storage"> | undefined,
+) {
+  if (!storageId) return;
+  await ctx.storage.delete(storageId);
+}
+
 /* -------------------------------------------------------------------------- */
 /* Public website                                                             */
 /* -------------------------------------------------------------------------- */
@@ -43,6 +113,15 @@ export const getPublicSite = query({
     const services = (await servicesInOrder(ctx)).filter(
       (service) => service.isPublished,
     );
+    const doctors = (
+      await ctx.db.query("doctors").withIndex("by_order").collect()
+    ).filter((doctor) => doctor.isPublished);
+    const management = (
+      await ctx.db.query("management").withIndex("by_order").collect()
+    ).filter((member) => member.isPublished);
+    const events = (
+      await ctx.db.query("events").withIndex("by_starts").collect()
+    ).filter((event) => event.isPublished);
 
     return {
       info: infoDoc?.isPublished ? infoDoc : null,
@@ -50,6 +129,19 @@ export const getPublicSite = query({
         slides.map((slide) => slideWithImage(ctx, slide)),
       ),
       services,
+      doctors: await Promise.all(
+        doctors.map(async (doctor) => ({
+          ...doctor,
+          photo: await profilePhoto(ctx, doctor.photoId, doctor.photoUrl),
+        })),
+      ),
+      management: await Promise.all(
+        management.map(async (member) => ({
+          ...member,
+          photo: await profilePhoto(ctx, member.photoId, member.photoUrl),
+        })),
+      ),
+      events: await Promise.all(events.map((event) => eventWithMedia(ctx, event))),
     };
   },
 });
@@ -66,6 +158,18 @@ export const getAdminSite = query({
     const infoDoc = await ctx.db.query("hospitalInfo").first();
     const slides = await slidesInOrder(ctx);
     const services = await servicesInOrder(ctx);
+    const doctors = await ctx.db
+      .query("doctors")
+      .withIndex("by_order")
+      .collect();
+    const management = await ctx.db
+      .query("management")
+      .withIndex("by_order")
+      .collect();
+    const events = await ctx.db
+      .query("events")
+      .withIndex("by_starts")
+      .collect();
 
     return {
       info: infoDoc ?? null,
@@ -73,6 +177,19 @@ export const getAdminSite = query({
         slides.map((slide) => slideWithImage(ctx, slide)),
       ),
       services,
+      doctors: await Promise.all(
+        doctors.map(async (doctor) => ({
+          ...doctor,
+          photo: await profilePhoto(ctx, doctor.photoId, doctor.photoUrl),
+        })),
+      ),
+      management: await Promise.all(
+        management.map(async (member) => ({
+          ...member,
+          photo: await profilePhoto(ctx, member.photoId, member.photoUrl),
+        })),
+      ),
+      events: await Promise.all(events.map((event) => eventWithMedia(ctx, event))),
     };
   },
 });
@@ -262,6 +379,365 @@ export const reorderServices = mutation({
   },
 });
 
+/* -------------------------------------------------------------------------- */
+/* Doctors                                                                    */
+/* -------------------------------------------------------------------------- */
+
+export const createDoctor = mutation({
+  args: {
+    name: v.string(),
+    specialty: v.string(),
+    bio: v.optional(v.string()),
+    photoId: v.optional(v.string()),
+    photoUrl: v.optional(v.string()),
+    isPublished: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const name = args.name.trim();
+    const specialty = args.specialty.trim();
+    if (!name) throw new Error("A doctor needs a name.");
+    if (!specialty) throw new Error("A doctor needs a specialty.");
+
+    const doctors = await ctx.db.query("doctors").withIndex("by_order").collect();
+    const order = doctors.reduce((max, doctor) => Math.max(max, doctor.order), -1) + 1;
+
+    return await ctx.db.insert("doctors", {
+      name,
+      specialty,
+      bio: args.bio?.trim() || undefined,
+      photoId: args.photoId ? (args.photoId as Id<"_storage">) : undefined,
+      photoUrl: args.photoUrl?.trim() || undefined,
+      isPublished: args.isPublished ?? false,
+      order,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+export const updateDoctor = mutation({
+  args: {
+    id: v.id("doctors"),
+    name: v.optional(v.string()),
+    specialty: v.optional(v.string()),
+    bio: v.optional(v.string()),
+    photoId: v.optional(v.string()),
+    photoUrl: v.optional(v.string()),
+    isPublished: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const existing = await ctx.db.get(args.id);
+    if (!existing) throw new Error("That doctor no longer exists.");
+
+    const patch: Partial<Doc<"doctors">> = { updatedAt: Date.now() };
+    if (args.name !== undefined) {
+      const name = args.name.trim();
+      if (!name) throw new Error("A doctor needs a name.");
+      patch.name = name;
+    }
+    if (args.specialty !== undefined) {
+      const specialty = args.specialty.trim();
+      if (!specialty) throw new Error("A doctor needs a specialty.");
+      patch.specialty = specialty;
+    }
+    if (args.bio !== undefined) patch.bio = args.bio.trim() || undefined;
+    if (args.photoId !== undefined) {
+      if (args.photoId) {
+        const nextPhotoId = args.photoId as Id<"_storage">;
+        if (existing.photoId && existing.photoId !== nextPhotoId) {
+          await deleteStorageFile(ctx, existing.photoId);
+        }
+        patch.photoId = nextPhotoId;
+      } else {
+        await deleteStorageFile(ctx, existing.photoId);
+        patch.photoId = undefined;
+      }
+    }
+    if (args.photoUrl !== undefined) patch.photoUrl = args.photoUrl.trim() || undefined;
+    if (args.isPublished !== undefined) patch.isPublished = args.isPublished;
+
+    await ctx.db.patch(args.id, patch);
+  },
+});
+
+export const deleteDoctor = mutation({
+  args: { id: v.id("doctors") },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const doctor = await ctx.db.get(args.id);
+    if (!doctor) return;
+    await deleteStorageFile(ctx, doctor.photoId);
+    await ctx.db.delete(args.id);
+  },
+});
+
+export const reorderDoctors = mutation({
+  args: { ids: v.array(v.id("doctors")) },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    for (const [index, id] of args.ids.entries()) {
+      await ctx.db.patch(id, { order: index, updatedAt: Date.now() });
+    }
+  },
+});
+
+/* -------------------------------------------------------------------------- */
+/* Management                                                                 */
+/* -------------------------------------------------------------------------- */
+
+export const createManagementMember = mutation({
+  args: {
+    name: v.string(),
+    role: v.string(),
+    bio: v.optional(v.string()),
+    photoId: v.optional(v.string()),
+    photoUrl: v.optional(v.string()),
+    isPublished: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const name = args.name.trim();
+    const role = args.role.trim();
+    if (!name) throw new Error("A management member needs a name.");
+    if (!role) throw new Error("Add a role or title for this management member.");
+
+    const members = await ctx.db
+      .query("management")
+      .withIndex("by_order")
+      .collect();
+    const order = members.reduce((max, member) => Math.max(max, member.order), -1) + 1;
+
+    return await ctx.db.insert("management", {
+      name,
+      role,
+      bio: args.bio?.trim() || undefined,
+      photoId: args.photoId ? (args.photoId as Id<"_storage">) : undefined,
+      photoUrl: args.photoUrl?.trim() || undefined,
+      isPublished: args.isPublished ?? false,
+      order,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+export const updateManagementMember = mutation({
+  args: {
+    id: v.id("management"),
+    name: v.optional(v.string()),
+    role: v.optional(v.string()),
+    bio: v.optional(v.string()),
+    photoId: v.optional(v.string()),
+    photoUrl: v.optional(v.string()),
+    isPublished: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const existing = await ctx.db.get(args.id);
+    if (!existing) throw new Error("That management member no longer exists.");
+
+    const patch: Partial<Doc<"management">> = { updatedAt: Date.now() };
+    if (args.name !== undefined) {
+      const name = args.name.trim();
+      if (!name) throw new Error("A management member needs a name.");
+      patch.name = name;
+    }
+    if (args.role !== undefined) {
+      const role = args.role.trim();
+      if (!role) throw new Error("Add a role or title for this management member.");
+      patch.role = role;
+    }
+    if (args.bio !== undefined) patch.bio = args.bio.trim() || undefined;
+    if (args.photoId !== undefined) {
+      if (args.photoId) {
+        const nextPhotoId = args.photoId as Id<"_storage">;
+        if (existing.photoId && existing.photoId !== nextPhotoId) {
+          await deleteStorageFile(ctx, existing.photoId);
+        }
+        patch.photoId = nextPhotoId;
+      } else {
+        await deleteStorageFile(ctx, existing.photoId);
+        patch.photoId = undefined;
+      }
+    }
+    if (args.photoUrl !== undefined) patch.photoUrl = args.photoUrl.trim() || undefined;
+    if (args.isPublished !== undefined) patch.isPublished = args.isPublished;
+
+    await ctx.db.patch(args.id, patch);
+  },
+});
+
+export const deleteManagementMember = mutation({
+  args: { id: v.id("management") },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const member = await ctx.db.get(args.id);
+    if (!member) return;
+    await deleteStorageFile(ctx, member.photoId);
+    await ctx.db.delete(args.id);
+  },
+});
+
+export const reorderManagement = mutation({
+  args: { ids: v.array(v.id("management")) },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    for (const [index, id] of args.ids.entries()) {
+      await ctx.db.patch(id, { order: index, updatedAt: Date.now() });
+    }
+  },
+});
+
+/* -------------------------------------------------------------------------- */
+/* Events                                                                     */
+/* -------------------------------------------------------------------------- */
+
+function validateEventWindow(startsAt: number, endsAt?: number) {
+  if (!Number.isFinite(startsAt) || startsAt <= 0) {
+    throw new Error("Choose a start date and time for the event.");
+  }
+  if (endsAt !== undefined && endsAt > 0 && endsAt < startsAt) {
+    throw new Error("An event cannot end before it starts.");
+  }
+}
+
+export const createEvent = mutation({
+  args: {
+    title: v.string(),
+    description: v.string(),
+    location: v.optional(v.string()),
+    startsAt: v.number(),
+    endsAt: v.optional(v.number()),
+    flyerId: v.optional(v.string()),
+    flyerUrl: v.optional(v.string()),
+    images: v.optional(v.array(mediaItemValidator)),
+    videos: v.optional(v.array(mediaItemValidator)),
+    isPublished: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const title = args.title.trim();
+    const description = args.description.trim();
+    if (!title) throw new Error("An event needs a title.");
+    if (!description) throw new Error("Add a description for this event.");
+    validateEventWindow(args.startsAt, args.endsAt);
+
+    return await ctx.db.insert("events", {
+      title,
+      description,
+      location: args.location?.trim() || undefined,
+      startsAt: args.startsAt,
+      endsAt: args.endsAt && args.endsAt > 0 ? args.endsAt : undefined,
+      flyerId: args.flyerId ? (args.flyerId as Id<"_storage">) : undefined,
+      flyerUrl: args.flyerUrl?.trim() || undefined,
+      images: mediaInput(args.images ?? []),
+      videos: mediaInput(args.videos ?? []),
+      isPublished: args.isPublished ?? false,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+export const updateEvent = mutation({
+  args: {
+    id: v.id("events"),
+    title: v.optional(v.string()),
+    description: v.optional(v.string()),
+    location: v.optional(v.string()),
+    startsAt: v.optional(v.number()),
+    endsAt: v.optional(v.number()),
+    flyerId: v.optional(v.string()),
+    flyerUrl: v.optional(v.string()),
+    images: v.optional(v.array(mediaItemValidator)),
+    videos: v.optional(v.array(mediaItemValidator)),
+    isPublished: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const existing = await ctx.db.get(args.id);
+    if (!existing) throw new Error("That event no longer exists.");
+
+    const nextStartsAt = args.startsAt ?? existing.startsAt;
+    const nextEndsAt = args.endsAt ?? existing.endsAt;
+    validateEventWindow(nextStartsAt, nextEndsAt);
+
+    const patch: Partial<Doc<"events">> = { updatedAt: Date.now() };
+    if (args.title !== undefined) {
+      const title = args.title.trim();
+      if (!title) throw new Error("An event needs a title.");
+      patch.title = title;
+    }
+    if (args.description !== undefined) {
+      const description = args.description.trim();
+      if (!description) throw new Error("Add a description for this event.");
+      patch.description = description;
+    }
+    if (args.location !== undefined) patch.location = args.location.trim() || undefined;
+    if (args.startsAt !== undefined) patch.startsAt = args.startsAt;
+    if (args.endsAt !== undefined) {
+      patch.endsAt = args.endsAt > 0 ? args.endsAt : undefined;
+    }
+
+    if (args.flyerId !== undefined) {
+      if (args.flyerId) {
+        const nextFlyerId = args.flyerId as Id<"_storage">;
+        if (existing.flyerId && existing.flyerId !== nextFlyerId) {
+          await deleteStorageFile(ctx, existing.flyerId);
+        }
+        patch.flyerId = nextFlyerId;
+      } else {
+        await deleteStorageFile(ctx, existing.flyerId);
+        patch.flyerId = undefined;
+      }
+    }
+    if (args.flyerUrl !== undefined) patch.flyerUrl = args.flyerUrl.trim() || undefined;
+
+    if (args.images !== undefined) {
+      const nextImages = mediaInput(args.images);
+      const keep = new Set(
+        nextImages.flatMap((item) => (item.storageId ? [item.storageId] : [])),
+      );
+      for (const image of existing.images) {
+        if (image.storageId && !keep.has(image.storageId)) {
+          await deleteStorageFile(ctx, image.storageId);
+        }
+      }
+      patch.images = nextImages;
+    }
+
+    if (args.videos !== undefined) {
+      const nextVideos = mediaInput(args.videos);
+      const keep = new Set(
+        nextVideos.flatMap((item) => (item.storageId ? [item.storageId] : [])),
+      );
+      for (const video of existing.videos) {
+        if (video.storageId && !keep.has(video.storageId)) {
+          await deleteStorageFile(ctx, video.storageId);
+        }
+      }
+      patch.videos = nextVideos;
+    }
+
+    if (args.isPublished !== undefined) patch.isPublished = args.isPublished;
+
+    await ctx.db.patch(args.id, patch);
+  },
+});
+
+export const deleteEvent = mutation({
+  args: { id: v.id("events") },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const event = await ctx.db.get(args.id);
+    if (!event) return;
+    await deleteStorageFile(ctx, event.flyerId);
+    for (const media of [...event.images, ...event.videos]) {
+      await deleteStorageFile(ctx, media.storageId);
+    }
+    await ctx.db.delete(args.id);
+  },
+});
+
 /** Create or update the single hospital information record. */
 export const saveHospitalInfo = mutation({
   args: {
@@ -316,7 +792,14 @@ export const saveHospitalInfo = mutation({
 });
 
 async function insertStarterContent(ctx: MutationCtx) {
-  const created = { info: false, slides: 0, services: 0 };
+  const created = {
+    info: false,
+    slides: 0,
+    services: 0,
+    doctors: 0,
+    management: 0,
+    events: 0,
+  };
 
     const existingInfo = await ctx.db.query("hospitalInfo").first();
     if (!existingInfo) {
@@ -440,6 +923,169 @@ async function insertStarterContent(ctx: MutationCtx) {
           updatedAt: Date.now(),
         });
         created.services += 1;
+      }
+    }
+
+    const doctors = await ctx.db
+      .query("doctors")
+      .withIndex("by_order")
+      .collect();
+    if (doctors.length === 0) {
+      const starterDoctors = [
+        {
+          name: "Dr. Kwame Asante",
+          specialty: "General Surgery",
+          bio: "General and emergency surgical care, including abdominal, hernia and trauma procedures.",
+          photoUrl:
+            "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&w=900&q=80",
+        },
+        {
+          name: "Dr. Ama Boateng",
+          specialty: "Obstetrics & Gynaecology",
+          bio: "Antenatal care, safe delivery and women's health, with a focus on supporting first-time mothers.",
+          photoUrl:
+            "https://images.unsplash.com/photo-1594824476967-48c8b964273f?auto=format&fit=crop&w=900&q=80",
+        },
+        {
+          name: "Dr. Yaw Owusu",
+          specialty: "Internal Medicine",
+          bio: "Diagnosis and management of adult medical conditions, including hypertension and diabetes.",
+          photoUrl:
+            "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=900&q=80",
+        },
+        {
+          name: "Dr. Akosua Mensah",
+          specialty: "Paediatrics",
+          bio: "Child health, growth monitoring, immunisation and the care of newborns and young children.",
+          photoUrl:
+            "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=900&q=80",
+        },
+      ];
+
+      for (const [index, doctor] of starterDoctors.entries()) {
+        await ctx.db.insert("doctors", {
+          ...doctor,
+          order: index,
+          isPublished: true,
+          updatedAt: Date.now(),
+        });
+        created.doctors += 1;
+      }
+    }
+
+    const management = await ctx.db
+      .query("management")
+      .withIndex("by_order")
+      .collect();
+    if (management.length === 0) {
+      const starterManagement = [
+        {
+          name: "Dr. Esi Frimpong",
+          role: "Medical Director",
+          bio: "Leads clinical services and quality improvement across the hospital.",
+          photoUrl:
+            "https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=900&q=80",
+        },
+        {
+          name: "Mrs. Abena Darko",
+          role: "Hospital Administrator",
+          bio: "Oversees hospital administration, patient services and community relations.",
+          photoUrl:
+            "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=900&q=80",
+        },
+        {
+          name: "Mr. Emmanuel Agyapong",
+          role: "Finance & Administration",
+          bio: "Responsible for finance, procurement and support services.",
+          photoUrl:
+            "https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=900&q=80",
+        },
+      ];
+
+      for (const [index, member] of starterManagement.entries()) {
+        await ctx.db.insert("management", {
+          ...member,
+          order: index,
+          isPublished: true,
+          updatedAt: Date.now(),
+        });
+        created.management += 1;
+      }
+    }
+
+    const events = await ctx.db
+      .query("events")
+      .withIndex("by_starts")
+      .collect();
+    if (events.length === 0) {
+      const upcoming = (days: number, hour: number, minute = 0) => {
+        const date = new Date();
+        date.setDate(date.getDate() + days);
+        date.setHours(hour, minute, 0, 0);
+        return date.getTime();
+      };
+
+      const starterEvents = [
+        {
+          title: "Community health screening at Atibie market",
+          description:
+            "Free blood pressure and blood sugar checks, health education and referrals for adults and older people in the community. Our public health team will be at the market square from morning until mid-afternoon.",
+          location: "Atibie Market Square",
+          startsAt: upcoming(12, 8, 30),
+          endsAt: upcoming(12, 15),
+          flyerUrl:
+            "https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=1400&q=80",
+          images: [
+            {
+              url: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=1200&q=80",
+            },
+            {
+              url: "https://images.unsplash.com/photo-1512678080530-7760d81faba6?auto=format&fit=crop&w=1200&q=80",
+            },
+          ],
+          videos: [],
+        },
+        {
+          title: "Maternal health open day",
+          description:
+            "Meet our midwives and doctors, tour the maternity unit and learn about antenatal care, safe delivery and newborn support. Expectant mothers and their families are welcome.",
+          location: "Hospital OPD hall",
+          startsAt: upcoming(25, 9),
+          endsAt: upcoming(25, 14),
+          flyerUrl:
+            "https://images.unsplash.com/photo-1512678080530-7760d81faba6?auto=format&fit=crop&w=1400&q=80",
+          images: [
+            {
+              url: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=1200&q=80",
+            },
+          ],
+          videos: [],
+        },
+        {
+          title: "World Diabetes Day awareness walk",
+          description:
+            "Join hospital staff, partners and community members for a morning walk to raise awareness of diabetes prevention and care. Free screening follows at the hospital.",
+          location: "Atibie town centre to the hospital",
+          startsAt: upcoming(40, 6, 30),
+          endsAt: upcoming(40, 9),
+          flyerUrl:
+            "https://images.unsplash.com/photo-1505751172876-fa1923c5c528?auto=format&fit=crop&w=1400&q=80",
+          images: [
+            {
+              url: "https://images.unsplash.com/photo-1538108149393-fbbd81895907?auto=format&fit=crop&w=1200&q=80",
+            },
+          ],
+          videos: [],
+        },
+      ];
+
+      for (const event of starterEvents) {
+        await ctx.db.insert("events", {
+          ...event,
+          isPublished: true,
+          updatedAt: Date.now(),
+        });
+        created.events += 1;
       }
     }
 
