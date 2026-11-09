@@ -1,0 +1,1285 @@
+import { AdminGate } from "@/components/admin/AdminGate";
+import { HospitalInfoForm } from "@/components/admin/HospitalInfoForm";
+import { ServiceDialog } from "@/components/admin/ServiceDialog";
+import { SlideDialog } from "@/components/admin/SlideDialog";
+import { HospitalMark } from "@/components/site/HospitalMark";
+import { ServiceIcon } from "@/components/site/ServiceIcon";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { Switch } from "@/components/ui/switch";
+import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
+import { useAuth } from "@/hooks/use-auth";
+import type { AdminSite, SiteService, SiteSlide } from "@/lib/site";
+import { cn } from "@/lib/utils";
+import { useMutation, useQuery } from "convex/react";
+import { motion } from "framer-motion";
+import {
+  ArrowDown,
+  ArrowUp,
+  Building2,
+  Check,
+  Circle,
+  Clock,
+  ExternalLink,
+  ImageOff,
+  Images,
+  LayoutDashboard,
+  Loader2,
+  LogOut,
+  MapPin,
+  Menu,
+  Pencil,
+  Plus,
+  ShieldCheck,
+  Sparkles,
+  Stethoscope,
+  Trash2,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
+import { useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router";
+import { toast } from "sonner";
+
+type Tab = "overview" | "slider" | "info" | "services" | "team";
+
+const TABS: {
+  value: Tab;
+  label: string;
+  hint: string;
+  icon: LucideIcon;
+}[] = [
+  {
+    value: "overview",
+    label: "Overview",
+    hint: "What the public website is showing",
+    icon: LayoutDashboard,
+  },
+  {
+    value: "slider",
+    label: "Slider banner",
+    hint: "Homepage images, headlines and links",
+    icon: Images,
+  },
+  {
+    value: "info",
+    label: "Hospital info",
+    hint: "Profile, hours and contact details",
+    icon: Building2,
+  },
+  {
+    value: "services",
+    label: "Services",
+    hint: "Departments shown on the public site",
+    icon: Stethoscope,
+  },
+  {
+    value: "team",
+    label: "Team access",
+    hint: "Who can publish content",
+    icon: Users,
+  },
+];
+
+export default function Dashboard() {
+  const { user } = useAuth();
+  const [tab, setTab] = useState<Tab>("overview");
+
+  if (!user) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </main>
+    );
+  }
+
+  if (user.role !== "admin") {
+    return <AdminGate />;
+  }
+
+  return <Console tab={tab} onTab={setTab} displayName={user.name || user.email} />;
+}
+
+function initialsOf(value?: string | null) {
+  if (!value) return "AD";
+  const parts = value.split(/[\s@._-]+/).filter(Boolean);
+  const letters = parts.slice(0, 2).map((part) => part.charAt(0).toUpperCase());
+  return letters.join("") || "AD";
+}
+
+function Console({
+  tab,
+  onTab,
+  displayName,
+}: {
+  tab: Tab;
+  onTab: (tab: Tab) => void;
+  displayName?: string | null;
+}) {
+  const site = useQuery(api.content.getAdminSite);
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  const activeTab = TABS.find((item) => item.value === tab) ?? TABS[0];
+  const firstName = displayName?.trim().split(/\s+/)[0] ?? "Administrator";
+
+  const counts = {
+    slider: site?.slides.length,
+    services: site?.services.length,
+  };
+
+  async function handleSignOut() {
+    await signOut();
+    navigate("/");
+  }
+
+  function selectTab(next: Tab) {
+    onTab(next);
+    setMobileNavOpen(false);
+  }
+
+  return (
+    <div className="min-h-screen bg-muted/30 lg:flex">
+      <aside className="hidden border-r border-border/80 bg-card lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-[264px] lg:shrink-0 lg:flex-col">
+        <div className="flex items-center gap-3 border-b border-border/70 px-5 py-5">
+          <HospitalMark className="size-10" />
+          <div className="min-w-0">
+            <p className="truncate font-display text-lg leading-tight tracking-tight">
+              Kwahu Gov&apos;t Hospital
+            </p>
+            <p className="mt-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Administrator console
+            </p>
+          </div>
+        </div>
+
+        <ConsoleNav active={tab} onSelect={selectTab} counts={counts} />
+
+        <div className="mt-auto border-t border-border/70 p-4">
+          <div className="flex items-center gap-3">
+            <span className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-xs font-semibold text-primary">
+              {initialsOf(displayName)}
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">
+                {displayName || "Administrator"}
+              </p>
+              <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                Administrator
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-2">
+            <Button asChild variant="outline" size="sm" className="justify-start">
+              <a href="/" target="_blank" rel="noreferrer">
+                <ExternalLink className="size-4" />
+                View public website
+              </a>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="justify-start text-muted-foreground"
+              onClick={handleSignOut}
+            >
+              <LogOut className="size-4" />
+              Sign out
+            </Button>
+          </div>
+        </div>
+      </aside>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-border/80 bg-background/90 px-4 backdrop-blur sm:px-6">
+          <div className="flex min-w-0 items-center gap-2">
+            <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+              <SheetTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-9 lg:hidden"
+                  aria-label="Open console menu"
+                >
+                  <Menu className="size-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-[86vw] max-w-xs p-0">
+                <SheetHeader className="border-b p-5 text-left">
+                  <div className="flex items-center gap-3 pr-8">
+                    <HospitalMark className="size-9" />
+                    <div>
+                      <SheetTitle className="font-display text-lg">
+                        Admin console
+                      </SheetTitle>
+                      <SheetDescription className="text-[10px] uppercase tracking-[0.16em]">
+                        Kwahu Government Hospital
+                      </SheetDescription>
+                    </div>
+                  </div>
+                </SheetHeader>
+                <ConsoleNav active={tab} onSelect={selectTab} counts={counts} />
+                <div className="mt-auto grid gap-2 border-t p-4">
+                  <Button asChild variant="outline" size="sm" className="justify-start">
+                    <a href="/" target="_blank" rel="noreferrer">
+                      <ExternalLink className="size-4" />
+                      View public website
+                    </a>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="justify-start text-muted-foreground"
+                    onClick={handleSignOut}
+                  >
+                    <LogOut className="size-4" />
+                    Sign out
+                  </Button>
+                </div>
+              </SheetContent>
+            </Sheet>
+
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{activeTab.label}</p>
+              <p className="hidden truncate text-[11px] text-muted-foreground sm:block">
+                {activeTab.hint}
+              </p>
+            </div>
+          </div>
+
+          <Button asChild variant="outline" size="sm" className="shrink-0 rounded-full">
+            <a href="/" target="_blank" rel="noreferrer">
+              <ExternalLink className="size-4" />
+              <span className="hidden sm:inline">View site</span>
+            </a>
+          </Button>
+        </header>
+
+        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
+          {!site ? (
+            <div className="flex min-h-[50vh] items-center justify-center gap-3 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" />
+              Loading hospital website content…
+            </div>
+          ) : (
+            <motion.div
+              key={tab}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25 }}
+            >
+              {tab === "overview" && (
+                <OverviewTab site={site} onTab={onTab} firstName={firstName} />
+              )}
+              {tab === "slider" && <SlidesTab slides={site.slides} />}
+              {tab === "info" && <InfoTab site={site} />}
+              {tab === "services" && <ServicesTab services={site.services} />}
+              {tab === "team" && <TeamTab />}
+            </motion.div>
+          )}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+function ConsoleNav({
+  active,
+  onSelect,
+  counts,
+}: {
+  active: Tab;
+  onSelect: (tab: Tab) => void;
+  counts: { slider?: number; services?: number };
+}) {
+  return (
+    <nav className="flex flex-col gap-1 p-3">
+      {TABS.map((item) => {
+        const isActive = item.value === active;
+        const count =
+          item.value === "slider"
+            ? counts.slider
+            : item.value === "services"
+              ? counts.services
+              : undefined;
+
+        return (
+          <button
+            key={item.value}
+            type="button"
+            onClick={() => onSelect(item.value)}
+            className={cn(
+              "flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-colors",
+              isActive
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+            )}
+          >
+            <item.icon className="size-4 shrink-0" />
+            <span className="flex-1">{item.label}</span>
+            {typeof count === "number" && (
+              <span
+                className={cn(
+                  "rounded-full px-2 py-0.5 text-[10px] font-medium tabular-nums",
+                  isActive
+                    ? "bg-primary-foreground/15 text-primary-foreground"
+                    : "bg-secondary text-secondary-foreground",
+                )}
+              >
+                {count}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  note,
+  icon: Icon,
+  onClick,
+}: {
+  label: string;
+  value: React.ReactNode;
+  note: string;
+  icon: LucideIcon;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-2xl border border-border/80 bg-card p-5 text-left transition-colors hover:border-primary/40"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <span className="eyebrow text-[10px]">{label}</span>
+        <Icon className="size-4 text-muted-foreground" />
+      </div>
+      <p className="mt-4 font-display text-3xl leading-none tracking-tight sm:text-4xl">
+        {value}
+      </p>
+      <p className="mt-2 text-xs text-muted-foreground">{note}</p>
+    </button>
+  );
+}
+
+function OverviewTab({
+  site,
+  onTab,
+  firstName,
+}: {
+  site: AdminSite;
+  onTab: (tab: Tab) => void;
+  firstName: string;
+}) {
+  const publishStarterContent = useMutation(api.content.publishStarterContent);
+  const [seeding, setSeeding] = useState(false);
+
+  const info = site.info;
+  const publishedSlides = site.slides.filter((slide) => slide.isPublished).length;
+  const publishedServices = site.services.filter(
+    (service) => service.isPublished,
+  ).length;
+
+  const steps = [
+    {
+      label: "Publish the hospital profile",
+      detail: "Name, about, mission, hours and contacts.",
+      done: info?.isPublished === true,
+      tab: "info" as Tab,
+    },
+    {
+      label: "Publish at least one slider banner",
+      detail: "The banner is the first thing visitors see.",
+      done: publishedSlides > 0,
+      tab: "slider" as Tab,
+    },
+    {
+      label: "Publish the hospital's services",
+      detail: "Departments and care areas for patients.",
+      done: publishedServices > 0,
+      tab: "services" as Tab,
+    },
+  ];
+  const completed = steps.filter((step) => step.done).length;
+  const showStarter =
+    site.slides.length === 0 ||
+    site.services.length === 0 ||
+    info === null;
+
+  async function handleSeed() {
+    setSeeding(true);
+    try {
+      const created = await publishStarterContent({});
+      toast.success("Starter content published.", {
+        description: `${created.slides} banners and ${created.services} services were added. Edit anything you like.`,
+      });
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not publish starter content.",
+      );
+    } finally {
+      setSeeding(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <span className="eyebrow">Site control room</span>
+        <h1 className="mt-2 font-display text-4xl tracking-tight text-balance">
+          Welcome back, {firstName}.
+        </h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+          Everything visitors see is created and published here. Draft content
+          stays private until you publish it.
+        </p>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <StatCard
+          label="Slider banners"
+          value={
+            <>
+              {publishedSlides}
+              <span className="text-xl text-muted-foreground">
+                /{site.slides.length}
+              </span>
+            </>
+          }
+          note={`${publishedSlides} published on the homepage`}
+          icon={Images}
+          onClick={() => onTab("slider")}
+        />
+        <StatCard
+          label="Hospital info"
+          value={info?.isPublished ? "Live" : info ? "Draft" : "Not set"}
+          note={
+            info
+              ? info.isPublished
+                ? "Profile and contacts are public"
+                : "Saved but hidden from visitors"
+              : "Add the hospital profile to get started"
+          }
+          icon={Building2}
+          onClick={() => onTab("info")}
+        />
+        <StatCard
+          label="Services"
+          value={
+            <>
+              {publishedServices}
+              <span className="text-xl text-muted-foreground">
+                /{site.services.length}
+              </span>
+            </>
+          }
+          note={`${publishedServices} published on the public site`}
+          icon={Stethoscope}
+          onClick={() => onTab("services")}
+        />
+      </div>
+
+      {showStarter && (
+        <div className="flex flex-col gap-4 rounded-2xl border border-dashed border-primary/35 bg-secondary/30 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+          <div>
+            <p className="flex items-center gap-2 text-sm font-semibold">
+              <Sparkles className="size-4 text-primary" />
+              Need a head start?
+            </p>
+            <p className="mt-1.5 max-w-xl text-xs leading-6 text-muted-foreground">
+              Publish editable starter content — a hospital profile, three
+              homepage banners and six services. Replace any wording, image or
+              number with your hospital&apos;s own before sharing the site.
+            </p>
+          </div>
+          <Button onClick={handleSeed} disabled={seeding} className="shrink-0">
+            {seeding ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Sparkles className="size-4" />
+            )}
+            Publish starter content
+          </Button>
+        </div>
+      )}
+
+      <div className="rounded-2xl border border-border/80 bg-card">
+        <div className="flex items-center justify-between gap-3 border-b border-border/70 px-5 py-4">
+          <div>
+            <p className="text-sm font-semibold">Publishing checklist</p>
+            <p className="text-xs text-muted-foreground">
+              {completed} of {steps.length} complete
+            </p>
+          </div>
+          <span className="font-display text-2xl text-primary">
+            {completed}/{steps.length}
+          </span>
+        </div>
+        <ul className="divide-y divide-border/70">
+          {steps.map((step) => (
+            <li key={step.label}>
+              <button
+                type="button"
+                onClick={() => onTab(step.tab)}
+                className="flex w-full items-start gap-3 px-5 py-4 text-left transition-colors hover:bg-secondary/40"
+              >
+                {step.done ? (
+                  <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
+                    <Check className="size-3" />
+                  </span>
+                ) : (
+                  <Circle className="mt-0.5 size-5 shrink-0 text-muted-foreground/40" />
+                )}
+                <span className="min-w-0 flex-1">
+                  <span
+                    className={cn(
+                      "block text-sm",
+                      step.done && "text-muted-foreground line-through",
+                    )}
+                  >
+                    {step.label}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    {step.detail}
+                  </span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-2xl border border-border/80 bg-card">
+          <div className="flex items-center justify-between gap-3 border-b border-border/70 px-5 py-4">
+            <p className="text-sm font-semibold">Homepage slider</p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onTab("slider")}
+              className="text-primary"
+            >
+              Manage
+            </Button>
+          </div>
+          {site.slides.length > 0 ? (
+            <ul className="divide-y divide-border/70">
+              {site.slides.slice(0, 3).map((slide) => (
+                <li key={slide._id} className="flex items-center gap-3 px-5 py-3">
+                  <div className="relative h-12 w-20 shrink-0 overflow-hidden rounded-lg bg-muted">
+                    {slide.image ? (
+                      <img
+                        src={slide.image}
+                        alt=""
+                        className="size-full object-cover"
+                      />
+                    ) : null}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm">{slide.title}</p>
+                    <p className="truncate text-[11px] text-muted-foreground">
+                      {slide.eyebrow || "Homepage banner"}
+                    </p>
+                  </div>
+                  <Badge
+                    variant={slide.isPublished ? "default" : "secondary"}
+                    className="rounded-full text-[10px]"
+                  >
+                    {slide.isPublished ? "Live" : "Draft"}
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="p-5">
+              <p className="text-xs leading-6 text-muted-foreground">
+                No banners yet. The homepage shows a branded fallback until the
+                first slide is published.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={() => onTab("slider")}
+              >
+                <Plus className="size-4" />
+                Create the first slide
+              </Button>
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-border/80 bg-card">
+          <div className="flex items-center justify-between gap-3 border-b border-border/70 px-5 py-4">
+            <p className="text-sm font-semibold">Hospital information</p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onTab("info")}
+              className="text-primary"
+            >
+              Edit
+            </Button>
+          </div>
+          <div className="space-y-3 p-5 text-sm">
+            <div className="flex items-start justify-between gap-3">
+              <span className="text-muted-foreground">Name</span>
+              <span className="text-right font-medium">
+                {info?.name || "Not set up"}
+              </span>
+            </div>
+            <div className="flex items-start justify-between gap-3">
+              <span className="text-muted-foreground">Visibility</span>
+              <Badge
+                variant={info?.isPublished ? "default" : "secondary"}
+                className="rounded-full text-[10px]"
+              >
+                {info?.isPublished ? "Published" : info ? "Draft" : "Not created"}
+              </Badge>
+            </div>
+            <div className="flex items-start justify-between gap-3">
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <Clock className="size-3.5" /> Visiting hours
+              </span>
+              <span className="max-w-[55%] text-right">
+                {info?.visitingHours || "—"}
+              </span>
+            </div>
+            <div className="flex items-start justify-between gap-3">
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <MapPin className="size-3.5" /> Address
+              </span>
+              <span className="max-w-[55%] text-right">
+                {info?.address || "—"}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SlidesTab({ slides }: { slides: SiteSlide[] }) {
+  const updateSlide = useMutation(api.content.updateSlide);
+  const deleteSlide = useMutation(api.content.deleteSlide);
+  const reorderSlides = useMutation(api.content.reorderSlides);
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<SiteSlide | null>(null);
+  const [deleting, setDeleting] = useState<SiteSlide | null>(null);
+
+  function openNew() {
+    setEditing(null);
+    setDialogOpen(true);
+  }
+
+  function openEdit(slide: SiteSlide) {
+    setEditing(slide);
+    setDialogOpen(true);
+  }
+
+  async function togglePublished(slide: SiteSlide, isPublished: boolean) {
+    try {
+      await updateSlide({ id: slide._id, isPublished });
+      toast.success(
+        isPublished ? "Banner published to the homepage." : "Banner moved to drafts.",
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not update this slide.",
+      );
+    }
+  }
+
+  async function move(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= slides.length) return;
+    const next = [...slides];
+    const current = next[index];
+    next[index] = next[target];
+    next[target] = current;
+    try {
+      await reorderSlides({ ids: next.map((slide) => slide._id) });
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not reorder slides.",
+      );
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleting) return;
+    try {
+      await deleteSlide({ id: deleting._id });
+      toast.success("Slider banner deleted.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not delete this slide.",
+      );
+    } finally {
+      setDeleting(null);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="font-display text-3xl tracking-tight sm:text-4xl">
+            Slider banner
+          </h1>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+            These slides rotate in the homepage hero. Use the arrows to set the
+            order visitors see them in.
+          </p>
+        </div>
+        <Button onClick={openNew} className="shrink-0">
+          <Plus className="size-4" />
+          New slide
+        </Button>
+      </div>
+
+      {slides.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center">
+          <span className="mx-auto grid size-12 place-items-center rounded-full bg-secondary text-primary">
+            <Images className="size-5" />
+          </span>
+          <p className="mt-4 font-display text-2xl tracking-tight">
+            No slider banners yet
+          </p>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+            Add a wide image, a strong headline and a link. Publish it to make
+            it the first thing visitors see.
+          </p>
+          <Button onClick={openNew} className="mt-5">
+            <Plus className="size-4" />
+            Create first slide
+          </Button>
+        </div>
+      ) : (
+        <ul className="space-y-3">
+          {slides.map((slide, index) => (
+            <li
+              key={slide._id}
+              className="flex flex-col gap-4 rounded-2xl border border-border/80 bg-card p-4 sm:flex-row sm:items-center"
+            >
+              <div className="relative aspect-[16/8] w-full overflow-hidden rounded-xl bg-muted sm:w-36 sm:shrink-0">
+                {slide.image ? (
+                  <img
+                    src={slide.image}
+                    alt=""
+                    className="size-full object-cover"
+                  />
+                ) : (
+                  <div className="grid size-full place-items-center text-muted-foreground">
+                    <ImageOff className="size-5" />
+                  </div>
+                )}
+                <span className="absolute left-2 top-2 rounded-full bg-primary/90 px-2 py-0.5 text-[10px] font-medium text-primary-foreground">
+                  {index + 1}
+                </span>
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge
+                    variant={slide.isPublished ? "default" : "secondary"}
+                    className="rounded-full text-[10px]"
+                  >
+                    {slide.isPublished ? "Live" : "Draft"}
+                  </Badge>
+                  {slide.eyebrow && (
+                    <span className="truncate text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                      {slide.eyebrow}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1.5 truncate font-display text-xl tracking-tight">
+                  {slide.title}
+                </p>
+                <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+                  {slide.subtitle || "No supporting text"}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-end">
+                <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                  Published
+                  <Switch
+                    checked={slide.isPublished}
+                    onCheckedChange={(checked) =>
+                      togglePublished(slide, checked)
+                    }
+                    aria-label={`Publish ${slide.title}`}
+                  />
+                </label>
+                <div className="flex items-center gap-0.5">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={index === 0}
+                    onClick={() => move(index, -1)}
+                    aria-label="Move slide up"
+                  >
+                    <ArrowUp className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={index === slides.length - 1}
+                    onClick={() => move(index, 1)}
+                    aria-label="Move slide down"
+                  >
+                    <ArrowDown className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => openEdit(slide)}
+                    aria-label={`Edit ${slide.title}`}
+                  >
+                    <Pencil className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => setDeleting(slide)}
+                    aria-label={`Delete ${slide.title}`}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <SlideDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        slide={editing}
+      />
+
+      <AlertDialog
+        open={deleting !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleting(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this banner?</AlertDialogTitle>
+            <AlertDialogDescription>
+              “{deleting?.title}” will be removed from the homepage and the
+              console. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep banner</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              Delete banner
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+function ServicesTab({ services }: { services: SiteService[] }) {
+  const updateService = useMutation(api.content.updateService);
+  const deleteService = useMutation(api.content.deleteService);
+  const reorderServices = useMutation(api.content.reorderServices);
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<SiteService | null>(null);
+  const [deleting, setDeleting] = useState<SiteService | null>(null);
+
+  function openNew() {
+    setEditing(null);
+    setDialogOpen(true);
+  }
+
+  function openEdit(service: SiteService) {
+    setEditing(service);
+    setDialogOpen(true);
+  }
+
+  async function togglePublished(service: SiteService, isPublished: boolean) {
+    try {
+      await updateService({ id: service._id, isPublished });
+      toast.success(
+        isPublished
+          ? "Service published to the website."
+          : "Service moved to drafts.",
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not update this service.",
+      );
+    }
+  }
+
+  async function move(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= services.length) return;
+    const next = [...services];
+    const current = next[index];
+    next[index] = next[target];
+    next[target] = current;
+    try {
+      await reorderServices({ ids: next.map((service) => service._id) });
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not reorder services.",
+      );
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleting) return;
+    try {
+      await deleteService({ id: deleting._id });
+      toast.success("Service deleted.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not delete this service.",
+      );
+    } finally {
+      setDeleting(null);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="font-display text-3xl tracking-tight sm:text-4xl">
+            Services & departments
+          </h1>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+            The care areas listed on the public hospital information page. Drag
+            free ordering is handled with the arrows.
+          </p>
+        </div>
+        <Button onClick={openNew} className="shrink-0">
+          <Plus className="size-4" />
+          New service
+        </Button>
+      </div>
+
+      {services.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center">
+          <span className="mx-auto grid size-12 place-items-center rounded-full bg-secondary text-primary">
+            <Stethoscope className="size-5" />
+          </span>
+          <p className="mt-4 font-display text-2xl tracking-tight">
+            No services published yet
+          </p>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+            Add the departments patients and partners should know about, then
+            publish each one.
+          </p>
+          <Button onClick={openNew} className="mt-5">
+            <Plus className="size-4" />
+            Create first service
+          </Button>
+        </div>
+      ) : (
+        <ul className="space-y-3">
+          {services.map((service, index) => (
+            <li
+              key={service._id}
+              className="flex flex-col gap-4 rounded-2xl border border-border/80 bg-card p-4 sm:flex-row sm:items-center"
+            >
+              <span className="grid size-11 shrink-0 place-items-center rounded-full bg-accent/20 text-accent-foreground">
+                <ServiceIcon name={service.icon} className="size-5" />
+              </span>
+
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge
+                    variant={service.isPublished ? "default" : "secondary"}
+                    className="rounded-full text-[10px]"
+                  >
+                    {service.isPublished ? "Live" : "Draft"}
+                  </Badge>
+                  <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                    Position {index + 1}
+                  </span>
+                </div>
+                <p className="mt-1.5 font-display text-xl tracking-tight">
+                  {service.title}
+                </p>
+                <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                  {service.description || "No description"}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-end">
+                <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                  Published
+                  <Switch
+                    checked={service.isPublished}
+                    onCheckedChange={(checked) =>
+                      togglePublished(service, checked)
+                    }
+                    aria-label={`Publish ${service.title}`}
+                  />
+                </label>
+                <div className="flex items-center gap-0.5">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={index === 0}
+                    onClick={() => move(index, -1)}
+                    aria-label="Move service up"
+                  >
+                    <ArrowUp className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={index === services.length - 1}
+                    onClick={() => move(index, 1)}
+                    aria-label="Move service down"
+                  >
+                    <ArrowDown className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => openEdit(service)}
+                    aria-label={`Edit ${service.title}`}
+                  >
+                    <Pencil className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => setDeleting(service)}
+                    aria-label={`Delete ${service.title}`}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <ServiceDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        service={editing}
+      />
+
+      <AlertDialog
+        open={deleting !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleting(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this service?</AlertDialogTitle>
+            <AlertDialogDescription>
+              “{deleting?.title}” will be removed from the public website and the
+              console. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep service</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              Delete service
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+function InfoTab({ site }: { site: AdminSite }) {
+  return (
+    <div className="space-y-5">
+      <div>
+        <h1 className="font-display text-3xl tracking-tight sm:text-4xl">
+          Hospital information
+        </h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+          This is the single source of truth for the hospital&apos;s name,
+          profile, opening hours and contact details across the public website.
+        </p>
+      </div>
+
+      <HospitalInfoForm info={site.info} />
+    </div>
+  );
+}
+
+function TeamTab() {
+  const { user } = useAuth();
+  const team = useQuery(api.admins.listTeam);
+  const setRole = useMutation(api.admins.setRole);
+
+  const admins = useMemo(
+    () => team?.filter((member) => member.role === "admin").length ?? 0,
+    [team],
+  );
+
+  async function changeRole(userId: Id<"users">, role: "admin" | "user") {
+    try {
+      await setRole({ userId, role });
+      toast.success(
+        role === "admin"
+          ? "Administrator access granted."
+          : "Administrator access revoked.",
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not change this role.",
+      );
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h1 className="font-display text-3xl tracking-tight sm:text-4xl">
+          Team access
+        </h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+          Only administrators can create or publish website content. Grant
+          access to colleagues who should help manage the site.
+        </p>
+      </div>
+
+      {!team ? (
+        <div className="flex items-center gap-3 rounded-2xl border bg-card p-6 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" />
+          Loading team…
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-2xl border border-border/80 bg-card">
+          <div className="flex items-center justify-between gap-3 border-b border-border/70 px-5 py-4">
+            <p className="text-sm font-semibold">Accounts</p>
+            <span className="text-xs text-muted-foreground">
+              {team.length} {team.length === 1 ? "account" : "accounts"} ·{" "}
+              {admins} {admins === 1 ? "administrator" : "administrators"}
+            </span>
+          </div>
+
+          <ul className="divide-y divide-border/70">
+            {team.map((member) => {
+              const isSelf = member.id === user?._id;
+              const isAdmin = member.role === "admin";
+              const label =
+                member.name?.trim() ||
+                (member.isAnonymous ? "Guest session" : "Unnamed account");
+
+              return (
+                <li
+                  key={member.id}
+                  className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-[11px] font-semibold text-primary">
+                      {initialsOf(member.name || member.email)}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">
+                        {label}
+                        {isSelf && (
+                          <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                            (you)
+                          </span>
+                        )}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {member.email || "No email on this account"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 sm:shrink-0">
+                    <Badge
+                      variant={isAdmin ? "default" : "secondary"}
+                      className="rounded-full text-[10px]"
+                    >
+                      {isAdmin ? "Administrator" : "No access"}
+                    </Badge>
+                    {isAdmin ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={isSelf}
+                        onClick={() => changeRole(member.id, "user")}
+                      >
+                        Revoke
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        onClick={() => changeRole(member.id, "admin")}
+                      >
+                        <ShieldCheck className="size-4" />
+                        Grant admin
+                      </Button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
+      <p className="text-xs leading-6 text-muted-foreground">
+        Colleagues appear here after signing in to the website once. To invite
+        someone new, share the website link and ask them to sign in at{" "}
+        <Link to="/auth" className="text-primary underline-offset-4 hover:underline">
+          /auth
+        </Link>
+        . They can then be granted administrator access from this panel.
+      </p>
+    </div>
+  );
+}
