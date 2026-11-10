@@ -129,7 +129,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
         </div>
 
         <div className="relative max-w-md py-12">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.28em] text-accent">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.28em] text-brand-soft">
             Administrator console
           </span>
           <h1 className="mt-5 font-display text-5xl leading-[1.02] tracking-tight text-balance">
@@ -164,7 +164,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
               },
             ].map((item) => (
               <li key={item.title} className="flex items-start gap-3">
-                <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-accent/20 text-accent">
+                <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-brand/10 text-brand">
                   <Check className="size-3" />
                 </span>
                 <span>

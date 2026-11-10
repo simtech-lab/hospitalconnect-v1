@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
+import { youtubeThumbnail } from "@/lib/video";
 import { useMutation } from "convex/react";
 import {
   ImageIcon,
@@ -50,7 +51,7 @@ export function ImageField({
   label: string;
   value: ImageValue;
   onChange: (value: ImageValue) => void;
-  shape?: "wide" | "portrait";
+  shape?: "wide" | "portrait" | "logo";
   hint?: string;
 }) {
   const generateUploadUrl = useMutation(api.content.generateUploadUrl);
@@ -98,14 +99,19 @@ export function ImageField({
             "relative overflow-hidden rounded-xl border bg-muted",
             shape === "portrait"
               ? "aspect-[4/5] w-32 shrink-0"
-              : "aspect-[16/8] w-full",
+              : shape === "logo"
+                ? "aspect-square w-28 shrink-0 bg-white"
+                : "aspect-[16/8] w-full",
           )}
         >
           {value.preview ? (
             <img
               src={value.preview}
               alt=""
-              className="size-full object-cover"
+              className={cn(
+                "size-full",
+                shape === "logo" ? "object-contain p-2" : "object-cover",
+              )}
             />
           ) : (
             <div className="flex size-full flex-col items-center justify-center gap-2 text-muted-foreground">
@@ -174,6 +180,151 @@ export function ImageField({
           URL.
         </p>
       )}
+    </div>
+  );
+}
+
+export function MediaField({
+  id,
+  label,
+  kind,
+  value,
+  onChange,
+  hint,
+}: {
+  id: string;
+  label: string;
+  kind: "image" | "video";
+  value: ImageValue;
+  onChange: (value: ImageValue) => void;
+  hint?: string;
+}) {
+  const generateUploadUrl = useMutation(api.content.generateUploadUrl);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const isVideo = kind === "video";
+
+  async function handleFile(file: File | undefined) {
+    if (!file) return;
+    if (isVideo ? !file.type.startsWith("video/") : !file.type.startsWith("image/")) {
+      toast.error(isVideo ? "Choose a video file." : "Choose an image file.");
+      return;
+    }
+    const maxMb = isVideo ? 40 : 8;
+    if (file.size > maxMb * 1024 * 1024) {
+      toast.error(`${isVideo ? "Videos" : "Images"} must be smaller than ${maxMb} MB.`);
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const uploadUrl = await generateUploadUrl({});
+      const storageId = await uploadFile(uploadUrl, file);
+      onChange({
+        storageId,
+        url: "",
+        preview: URL.createObjectURL(file),
+      });
+      toast.success("Media uploaded. Save to keep it.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not upload that file.",
+      );
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={`${id}-url`}>{label}</Label>
+
+      <div className="relative aspect-video w-full overflow-hidden rounded-xl border bg-muted">
+        {value.preview ? (
+          isVideo ? (
+            youtubeThumbnail(value.preview) ? (
+              <img
+                src={youtubeThumbnail(value.preview) ?? ""}
+                alt=""
+                className="size-full object-cover"
+              />
+            ) : (
+              <video
+                src={value.preview}
+                muted
+                playsInline
+                controls
+                className="size-full bg-black object-contain"
+              />
+            )
+          ) : (
+            <img
+              src={value.preview}
+              alt=""
+              className="size-full object-cover"
+            />
+          )
+        ) : (
+          <div className="flex size-full flex-col items-center justify-center gap-2 text-muted-foreground">
+            {isVideo ? <Video className="size-6" /> : <ImageIcon className="size-6" />}
+            <span className="text-[11px]">No {isVideo ? "video" : "photo"}</span>
+          </div>
+        )}
+        {uploading && (
+          <div className="absolute inset-0 grid place-items-center bg-background/75">
+            <Loader2 className="size-5 animate-spin text-primary" />
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <label
+          className={cn(
+            buttonVariants({ variant: "outline", size: "sm" }),
+            "cursor-pointer",
+            uploading ? "pointer-events-none opacity-50" : "",
+          )}
+        >
+          <Upload className="size-4" />
+          {value.preview ? "Replace" : "Upload"}
+          <input
+            ref={fileRef}
+            type="file"
+            accept={isVideo ? "video/*" : "image/*"}
+            className="hidden"
+            onChange={(event) => handleFile(event.target.files?.[0])}
+          />
+        </label>
+        {value.preview && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => onChange(emptyImage())}
+          >
+            <Trash2 className="size-4" />
+            Remove
+          </Button>
+        )}
+        <span className="max-w-56 text-[11px] leading-5 text-muted-foreground">
+          {hint ?? (isVideo ? "MP4 or WebM, up to 40 MB" : "JPG or PNG, up to 8 MB")}
+        </span>
+      </div>
+
+      <Input
+        id={`${id}-url`}
+        value={value.storageId ? "" : value.url}
+        disabled={Boolean(value.storageId)}
+        placeholder={isVideo ? "…or paste a YouTube or video URL" : "…or paste an image URL"}
+        onChange={(event) =>
+          onChange({
+            storageId: null,
+            url: event.target.value,
+            preview: event.target.value,
+          })
+        }
+      />
     </div>
   );
 }

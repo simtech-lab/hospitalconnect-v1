@@ -1,7 +1,9 @@
 import { AdminGate } from "@/components/admin/AdminGate";
 import { DoctorDialog } from "@/components/admin/DoctorDialog";
 import { EventDialog } from "@/components/admin/EventDialog";
+import { GalleryDialog } from "@/components/admin/GalleryDialog";
 import { HospitalInfoForm } from "@/components/admin/HospitalInfoForm";
+import { PartnerDialog } from "@/components/admin/PartnerDialog";
 import { ManagementDialog } from "@/components/admin/ManagementDialog";
 import { ServiceDialog } from "@/components/admin/ServiceDialog";
 import { SlideDialog } from "@/components/admin/SlideDialog";
@@ -33,6 +35,7 @@ import { Switch } from "@/components/ui/switch";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useAuth } from "@/hooks/use-auth";
+import { youtubeThumbnail } from "@/lib/video";
 import {
   formatEventDateRange,
   formatEventTimeRange,
@@ -42,6 +45,8 @@ import type {
   AdminSite,
   ManagementMember,
   SiteDoctor,
+  SiteGalleryItem,
+  SitePartner,
   SiteEvent,
   SiteService,
   SiteSlide,
@@ -54,10 +59,12 @@ import {
   ArrowUp,
   Building2,
   CalendarDays,
+  Camera,
   Check,
   Circle,
   Clock,
   ExternalLink,
+  Handshake,
   ImageOff,
   Images,
   LayoutDashboard,
@@ -91,6 +98,8 @@ type Tab =
   | "doctors"
   | "management"
   | "events"
+  | "partners"
+  | "gallery"
   | "team";
 
 const TABS: {
@@ -140,6 +149,18 @@ const TABS: {
     label: "Events",
     hint: "Upcoming events, flyers and media",
     icon: CalendarDays,
+  },
+  {
+    value: "partners",
+    label: "Partners",
+    hint: "Partner logos shown on the website",
+    icon: Handshake,
+  },
+  {
+    value: "gallery",
+    label: "Gallery",
+    hint: "Titled photos and videos",
+    icon: Camera,
   },
   {
     value: "team",
@@ -198,6 +219,8 @@ function Console({
     doctors: site?.doctors.length,
     management: site?.management.length,
     events: site?.events.length,
+    partners: site?.partners.length,
+    gallery: site?.gallery.length,
   };
 
   async function handleSignOut() {
@@ -350,6 +373,8 @@ function Console({
                 <ManagementTab members={site.management} />
               )}
               {tab === "events" && <EventsTab events={site.events} />}
+              {tab === "partners" && <PartnersTab partners={site.partners} />}
+              {tab === "gallery" && <GalleryTab items={site.gallery} />}
               {tab === "team" && <TeamTab />}
             </motion.div>
           )}
@@ -369,7 +394,7 @@ function ConsoleNav({
   counts: Partial<Record<Tab, number>>;
 }) {
   return (
-    <nav className="flex flex-col gap-1 p-3">
+    <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-3">
       {TABS.map((item) => {
         const isActive = item.value === active;
         const count = counts[item.value];
@@ -464,6 +489,12 @@ function OverviewTab({
   const publishedEvents = site.events.filter(
     (event) => event.isPublished,
   ).length;
+  const publishedPartners = site.partners.filter(
+    (partner) => partner.isPublished,
+  ).length;
+  const publishedGallery = site.gallery.filter(
+    (item) => item.isPublished,
+  ).length;
 
   const steps = [
     {
@@ -496,6 +527,18 @@ function OverviewTab({
       done: publishedEvents > 0,
       tab: "events" as Tab,
     },
+    {
+      label: "Add a partner organisation",
+      detail: "Show the institutions supporting the hospital.",
+      done: publishedPartners > 0,
+      tab: "partners" as Tab,
+    },
+    {
+      label: "Publish gallery photos and videos",
+      detail: "Give visitors a look inside the hospital.",
+      done: publishedGallery > 0,
+      tab: "gallery" as Tab,
+    },
   ];
   const completed = steps.filter((step) => step.done).length;
   const showStarter =
@@ -504,6 +547,8 @@ function OverviewTab({
     site.doctors.length === 0 ||
     site.management.length === 0 ||
     site.events.length === 0 ||
+    site.partners.length === 0 ||
+    site.gallery.length === 0 ||
     info === null;
 
   async function handleSeed() {
@@ -511,7 +556,7 @@ function OverviewTab({
     try {
       const created = await publishStarterContent({});
       toast.success("Starter content published.", {
-        description: `${created.slides} banners, ${created.services} services, ${created.doctors} doctors, ${created.management} management profiles and ${created.events} events were added. Edit anything you like.`,
+        description: `${created.slides} banners, ${created.services} services, ${created.doctors} doctors, ${created.management} management profiles, ${created.events} events, ${created.partners} partner logos and ${created.gallery} gallery items were added. Edit anything you like.`,
       });
     } catch (error) {
       toast.error(
@@ -621,6 +666,34 @@ function OverviewTab({
           icon={CalendarDays}
           onClick={() => onTab("events")}
         />
+        <StatCard
+          label="Partners"
+          value={
+            <>
+              {publishedPartners}
+              <span className="text-xl text-muted-foreground">
+                /{site.partners.length}
+              </span>
+            </>
+          }
+          note={`${publishedPartners} logos on the public site`}
+          icon={Handshake}
+          onClick={() => onTab("partners")}
+        />
+        <StatCard
+          label="Gallery"
+          value={
+            <>
+              {publishedGallery}
+              <span className="text-xl text-muted-foreground">
+                /{site.gallery.length}
+              </span>
+            </>
+          }
+          note={`${publishedGallery} published photos and videos`}
+          icon={Camera}
+          onClick={() => onTab("gallery")}
+        />
       </div>
 
       {showStarter && (
@@ -632,9 +705,9 @@ function OverviewTab({
             </p>
             <p className="mt-1.5 max-w-xl text-xs leading-6 text-muted-foreground">
               Publish editable starter content — a hospital profile, homepage
-              banners, services, doctor and management profiles and sample
-              events. Replace any wording, image or number with your
-              hospital&apos;s own before sharing the site.
+              banners, services, doctor and management profiles, sample events,
+              partner logos and gallery media. Replace any wording, image or
+              number with your hospital&apos;s own before sharing the site.
             </p>
           </div>
           <Button onClick={handleSeed} disabled={seeding} className="shrink-0">
@@ -1143,7 +1216,7 @@ function ServicesTab({ services }: { services: SiteService[] }) {
               key={service._id}
               className="flex flex-col gap-4 rounded-2xl border border-border/80 bg-card p-4 sm:flex-row sm:items-center"
             >
-              <span className="grid size-11 shrink-0 place-items-center rounded-full bg-accent/20 text-accent-foreground">
+              <span className="grid size-11 shrink-0 place-items-center rounded-full bg-brand/10 text-brand">
                 <ServiceIcon name={service.icon} className="size-5" />
               </span>
 
@@ -1909,6 +1982,483 @@ function EventsTab({ events }: { events: SiteEvent[] }) {
               className="bg-destructive text-white hover:bg-destructive/90"
             >
               Delete event
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+function PartnersTab({ partners }: { partners: SitePartner[] }) {
+  const updatePartner = useMutation(api.content.updatePartner);
+  const deletePartner = useMutation(api.content.deletePartner);
+  const reorderPartners = useMutation(api.content.reorderPartners);
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<SitePartner | null>(null);
+  const [deleting, setDeleting] = useState<SitePartner | null>(null);
+
+  function openNew() {
+    setEditing(null);
+    setDialogOpen(true);
+  }
+
+  function openEdit(partner: SitePartner) {
+    setEditing(partner);
+    setDialogOpen(true);
+  }
+
+  async function togglePublished(partner: SitePartner, isPublished: boolean) {
+    try {
+      await updatePartner({ id: partner._id, isPublished });
+      toast.success(
+        isPublished
+          ? "Partner published to the website."
+          : "Partner moved to drafts.",
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not update this partner.",
+      );
+    }
+  }
+
+  async function move(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= partners.length) return;
+    const next = [...partners];
+    const current = next[index];
+    next[index] = next[target];
+    next[target] = current;
+    try {
+      await reorderPartners({ ids: next.map((partner) => partner._id) });
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not reorder partners.",
+      );
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleting) return;
+    try {
+      await deletePartner({ id: deleting._id });
+      toast.success("Partner deleted.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not delete this partner.",
+      );
+    } finally {
+      setDeleting(null);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="font-display text-3xl tracking-tight sm:text-4xl">
+            Our partners
+          </h1>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+            Partner logos appear in the “In partnership with” strip on the public
+            website. Use the arrows to set their order.
+          </p>
+        </div>
+        <Button onClick={openNew} className="shrink-0">
+          <Plus className="size-4" />
+          Add partner
+        </Button>
+      </div>
+
+      {partners.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center">
+          <span className="mx-auto grid size-12 place-items-center rounded-full bg-secondary text-primary">
+            <Handshake className="size-5" />
+          </span>
+          <p className="mt-4 font-display text-2xl tracking-tight">
+            No partners added yet
+          </p>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+            Add the organisations that support the hospital, with their logo and
+            name, then publish them to the website.
+          </p>
+          <Button onClick={openNew} className="mt-5">
+            <Plus className="size-4" />
+            Add the first partner
+          </Button>
+        </div>
+      ) : (
+        <ul className="space-y-3">
+          {partners.map((partner, index) => (
+            <li
+              key={partner._id}
+              className="flex flex-col gap-4 rounded-2xl border border-border/80 bg-card p-4 sm:flex-row sm:items-center"
+            >
+              <div className="grid h-20 w-full place-items-center overflow-hidden rounded-xl border border-border/70 bg-white p-2 sm:w-28 sm:shrink-0">
+                {partner.logo ? (
+                  <img
+                    src={partner.logo}
+                    alt=""
+                    className="max-h-full max-w-full object-contain"
+                  />
+                ) : (
+                  <Handshake className="size-6 text-muted-foreground" />
+                )}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge
+                    variant={partner.isPublished ? "default" : "secondary"}
+                    className="rounded-full text-[10px]"
+                  >
+                    {partner.isPublished ? "Live" : "Draft"}
+                  </Badge>
+                  <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                    Position {index + 1}
+                  </span>
+                </div>
+                <p className="mt-1.5 font-display text-xl tracking-tight">
+                  {partner.name}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-end">
+                <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                  Published
+                  <Switch
+                    checked={partner.isPublished}
+                    onCheckedChange={(checked) =>
+                      togglePublished(partner, checked)
+                    }
+                    aria-label={`Publish ${partner.name}`}
+                  />
+                </label>
+                <div className="flex items-center gap-0.5">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={index === 0}
+                    onClick={() => move(index, -1)}
+                    aria-label={`Move ${partner.name} up`}
+                  >
+                    <ArrowUp className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={index === partners.length - 1}
+                    onClick={() => move(index, 1)}
+                    aria-label={`Move ${partner.name} down`}
+                  >
+                    <ArrowDown className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => openEdit(partner)}
+                    aria-label={`Edit ${partner.name}`}
+                  >
+                    <Pencil className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => setDeleting(partner)}
+                    aria-label={`Delete ${partner.name}`}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <PartnerDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        partner={editing}
+      />
+
+      <AlertDialog
+        open={deleting !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleting(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this partner?</AlertDialogTitle>
+            <AlertDialogDescription>
+              “{deleting?.name}” and its logo will be removed from the website
+              and the console. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep partner</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              Delete partner
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+function GalleryTab({ items }: { items: SiteGalleryItem[] }) {
+  const updateGalleryItem = useMutation(api.content.updateGalleryItem);
+  const deleteGalleryItem = useMutation(api.content.deleteGalleryItem);
+  const reorderGallery = useMutation(api.content.reorderGallery);
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<SiteGalleryItem | null>(null);
+  const [deleting, setDeleting] = useState<SiteGalleryItem | null>(null);
+
+  function openNew() {
+    setEditing(null);
+    setDialogOpen(true);
+  }
+
+  function openEdit(item: SiteGalleryItem) {
+    setEditing(item);
+    setDialogOpen(true);
+  }
+
+  async function togglePublished(item: SiteGalleryItem, isPublished: boolean) {
+    try {
+      await updateGalleryItem({ id: item._id, isPublished });
+      toast.success(
+        isPublished
+          ? "Gallery item published to the website."
+          : "Gallery item moved to drafts.",
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not update this gallery item.",
+      );
+    }
+  }
+
+  async function move(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= items.length) return;
+    const next = [...items];
+    const current = next[index];
+    next[index] = next[target];
+    next[target] = current;
+    try {
+      await reorderGallery({ ids: next.map((item) => item._id) });
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not reorder the gallery.",
+      );
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleting) return;
+    try {
+      await deleteGalleryItem({ id: deleting._id });
+      toast.success("Gallery item deleted.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not delete this gallery item.",
+      );
+    } finally {
+      setDeleting(null);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="font-display text-3xl tracking-tight sm:text-4xl">
+            Photo & video gallery
+          </h1>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+            Add titled photos or videos to the public gallery. Photos and videos
+            can be uploaded or linked by URL.
+          </p>
+        </div>
+        <Button onClick={openNew} className="shrink-0">
+          <Plus className="size-4" />
+          Add gallery item
+        </Button>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center">
+          <span className="mx-auto grid size-12 place-items-center rounded-full bg-secondary text-primary">
+            <Camera className="size-5" />
+          </span>
+          <p className="mt-4 font-display text-2xl tracking-tight">
+            The gallery is empty
+          </p>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+            Add photos with titles and short videos showing the hospital, its
+            teams and community work.
+          </p>
+          <Button onClick={openNew} className="mt-5">
+            <Plus className="size-4" />
+            Add the first item
+          </Button>
+        </div>
+      ) : (
+        <ul className="space-y-3">
+          {items.map((item, index) => (
+            <li
+              key={item._id}
+              className="flex flex-col gap-4 rounded-2xl border border-border/80 bg-card p-4 sm:flex-row sm:items-center"
+            >
+              <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-muted sm:w-28 sm:shrink-0">
+                {item.kind === "image" && item.src ? (
+                  <img
+                    src={item.src}
+                    alt=""
+                    className="size-full object-cover"
+                  />
+                ) : item.kind === "video" && item.src ? (
+                  youtubeThumbnail(item.src) ? (
+                    <img
+                      src={youtubeThumbnail(item.src) ?? ""}
+                      alt=""
+                      className="size-full object-cover"
+                    />
+                  ) : (
+                    <video
+                      src={item.src}
+                      muted
+                      playsInline
+                      preload="metadata"
+                      className="size-full bg-black object-cover"
+                    />
+                  )
+                ) : (
+                  <div className="grid size-full place-items-center text-muted-foreground">
+                    {item.kind === "video" ? (
+                      <Video className="size-5" />
+                    ) : (
+                      <Camera className="size-5" />
+                    )}
+                  </div>
+                )}
+                <span className="absolute left-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-white backdrop-blur">
+                  {item.kind === "video" ? "Video" : "Photo"}
+                </span>
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge
+                    variant={item.isPublished ? "default" : "secondary"}
+                    className="rounded-full text-[10px]"
+                  >
+                    {item.isPublished ? "Live" : "Draft"}
+                  </Badge>
+                  <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                    Position {index + 1}
+                  </span>
+                </div>
+                <p className="mt-1.5 font-display text-xl tracking-tight">
+                  {item.title}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-end">
+                <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                  Published
+                  <Switch
+                    checked={item.isPublished}
+                    onCheckedChange={(checked) =>
+                      togglePublished(item, checked)
+                    }
+                    aria-label={`Publish ${item.title}`}
+                  />
+                </label>
+                <div className="flex items-center gap-0.5">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={index === 0}
+                    onClick={() => move(index, -1)}
+                    aria-label={`Move ${item.title} up`}
+                  >
+                    <ArrowUp className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={index === items.length - 1}
+                    onClick={() => move(index, 1)}
+                    aria-label={`Move ${item.title} down`}
+                  >
+                    <ArrowDown className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => openEdit(item)}
+                    aria-label={`Edit ${item.title}`}
+                  >
+                    <Pencil className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => setDeleting(item)}
+                    aria-label={`Delete ${item.title}`}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <GalleryDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        item={editing}
+      />
+
+      <AlertDialog
+        open={deleting !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleting(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this gallery item?</AlertDialogTitle>
+            <AlertDialogDescription>
+              “{deleting?.title}” will be removed from the public gallery and the
+              console. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep item</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              Delete item
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

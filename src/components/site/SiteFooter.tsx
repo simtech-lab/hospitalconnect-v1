@@ -78,6 +78,22 @@ export function SiteFooter({
               </li>
               <li>
                 <a
+                  href={sectionHref("#partners")}
+                  className="transition-colors hover:text-primary"
+                >
+                  Our partners
+                </a>
+              </li>
+              <li>
+                <a
+                  href={sectionHref("#gallery")}
+                  className="transition-colors hover:text-primary"
+                >
+                  Photo & video gallery
+                </a>
+              </li>
+              <li>
+                <a
                   href={sectionHref("#visit")}
                   className="transition-colors hover:text-primary"
                 >
@@ -113,7 +129,7 @@ export function SiteFooter({
               )}
               {emergency && emergency !== phone && (
                 <li className="flex items-start gap-2.5">
-                  <Phone className="mt-0.5 size-4 shrink-0 text-accent-foreground" />
+                  <Phone className="mt-0.5 size-4 shrink-0 text-brand" />
                   <span>
                     <span className="font-medium text-foreground">Emergency</span>{" "}
                     ·{" "}

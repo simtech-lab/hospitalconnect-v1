@@ -42,6 +42,21 @@ async function profilePhoto(
   return uploaded ?? photoUrl ?? null;
 }
 
+/** Resolve a partner logo and a gallery item's image or video. */
+async function partnerWithLogo(ctx: QueryCtx, partner: Doc<"partners">) {
+  return {
+    ...partner,
+    logo: await profilePhoto(ctx, partner.logoId, partner.logoUrl),
+  };
+}
+
+async function galleryItemWithMedia(ctx: QueryCtx, item: Doc<"gallery">) {
+  return {
+    ...item,
+    src: await profilePhoto(ctx, item.mediaId, item.mediaUrl),
+  };
+}
+
 /** Attach resolved URLs to an event's flyer and media library. */
 async function eventWithMedia(ctx: QueryCtx, event: Doc<"events">) {
   const uploadedFlyer = event.flyerId
@@ -122,6 +137,12 @@ export const getPublicSite = query({
     const events = (
       await ctx.db.query("events").withIndex("by_starts").collect()
     ).filter((event) => event.isPublished);
+    const partners = (
+      await ctx.db.query("partners").withIndex("by_order").collect()
+    ).filter((partner) => partner.isPublished);
+    const gallery = (
+      await ctx.db.query("gallery").withIndex("by_order").collect()
+    ).filter((item) => item.isPublished);
 
     return {
       info: infoDoc?.isPublished ? infoDoc : null,
@@ -142,6 +163,8 @@ export const getPublicSite = query({
         })),
       ),
       events: await Promise.all(events.map((event) => eventWithMedia(ctx, event))),
+      partners: await Promise.all(partners.map((partner) => partnerWithLogo(ctx, partner))),
+      gallery: await Promise.all(gallery.map((item) => galleryItemWithMedia(ctx, item))),
     };
   },
 });
@@ -170,6 +193,14 @@ export const getAdminSite = query({
       .query("events")
       .withIndex("by_starts")
       .collect();
+    const partners = await ctx.db
+      .query("partners")
+      .withIndex("by_order")
+      .collect();
+    const gallery = await ctx.db
+      .query("gallery")
+      .withIndex("by_order")
+      .collect();
 
     return {
       info: infoDoc ?? null,
@@ -190,6 +221,8 @@ export const getAdminSite = query({
         })),
       ),
       events: await Promise.all(events.map((event) => eventWithMedia(ctx, event))),
+      partners: await Promise.all(partners.map((partner) => partnerWithLogo(ctx, partner))),
+      gallery: await Promise.all(gallery.map((item) => galleryItemWithMedia(ctx, item))),
     };
   },
 });
@@ -738,6 +771,234 @@ export const deleteEvent = mutation({
   },
 });
 
+/* -------------------------------------------------------------------------- */
+/* Partners                                                                   */
+/* -------------------------------------------------------------------------- */
+
+export const createPartner = mutation({
+  args: {
+    name: v.string(),
+    logoId: v.optional(v.string()),
+    logoUrl: v.optional(v.string()),
+    isPublished: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const name = args.name.trim();
+    if (!name) throw new Error("A partner needs a name.");
+    if (!args.logoId && !args.logoUrl?.trim()) {
+      throw new Error("Add a logo for this partner.");
+    }
+
+    const partners = await ctx.db
+      .query("partners")
+      .withIndex("by_order")
+      .collect();
+    const order =
+      partners.reduce((max, partner) => Math.max(max, partner.order), -1) + 1;
+
+    return await ctx.db.insert("partners", {
+      name,
+      logoId: args.logoId ? (args.logoId as Id<"_storage">) : undefined,
+      logoUrl: args.logoUrl?.trim() || undefined,
+      isPublished: args.isPublished ?? false,
+      order,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+export const updatePartner = mutation({
+  args: {
+    id: v.id("partners"),
+    name: v.optional(v.string()),
+    logoId: v.optional(v.string()),
+    logoUrl: v.optional(v.string()),
+    isPublished: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const existing = await ctx.db.get(args.id);
+    if (!existing) throw new Error("That partner no longer exists.");
+
+    const patch: Partial<Doc<"partners">> = { updatedAt: Date.now() };
+    if (args.name !== undefined) {
+      const name = args.name.trim();
+      if (!name) throw new Error("A partner needs a name.");
+      patch.name = name;
+    }
+
+    const nextLogoId =
+      args.logoId !== undefined
+        ? args.logoId
+          ? (args.logoId as Id<"_storage">)
+          : undefined
+        : existing.logoId;
+    const nextLogoUrl =
+      args.logoUrl !== undefined
+        ? args.logoUrl.trim() || undefined
+        : existing.logoUrl;
+    if (!nextLogoId && !nextLogoUrl) {
+      throw new Error("Add a logo for this partner.");
+    }
+
+    if (args.logoId !== undefined) {
+      if (args.logoId) {
+        const nextLogoId = args.logoId as Id<"_storage">;
+        if (existing.logoId && existing.logoId !== nextLogoId) {
+          await deleteStorageFile(ctx, existing.logoId);
+        }
+        patch.logoId = nextLogoId;
+      } else {
+        await deleteStorageFile(ctx, existing.logoId);
+        patch.logoId = undefined;
+      }
+    }
+    if (args.logoUrl !== undefined) patch.logoUrl = args.logoUrl.trim() || undefined;
+    if (args.isPublished !== undefined) patch.isPublished = args.isPublished;
+
+    await ctx.db.patch(args.id, patch);
+  },
+});
+
+export const deletePartner = mutation({
+  args: { id: v.id("partners") },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const partner = await ctx.db.get(args.id);
+    if (!partner) return;
+    await deleteStorageFile(ctx, partner.logoId);
+    await ctx.db.delete(args.id);
+  },
+});
+
+export const reorderPartners = mutation({
+  args: { ids: v.array(v.id("partners")) },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    for (const [index, id] of args.ids.entries()) {
+      await ctx.db.patch(id, { order: index, updatedAt: Date.now() });
+    }
+  },
+});
+
+/* -------------------------------------------------------------------------- */
+/* Gallery                                                                    */
+/* -------------------------------------------------------------------------- */
+
+export const createGalleryItem = mutation({
+  args: {
+    title: v.string(),
+    kind: v.union(v.literal("image"), v.literal("video")),
+    mediaId: v.optional(v.string()),
+    mediaUrl: v.optional(v.string()),
+    isPublished: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const title = args.title.trim();
+    if (!title) throw new Error("Add a title for this gallery item.");
+    if (!args.mediaId && !args.mediaUrl?.trim()) {
+      throw new Error(
+        args.kind === "image" ? "Add a photo." : "Add a video.",
+      );
+    }
+
+    const items = await ctx.db.query("gallery").withIndex("by_order").collect();
+    const order = items.reduce((max, item) => Math.max(max, item.order), -1) + 1;
+
+    return await ctx.db.insert("gallery", {
+      title,
+      kind: args.kind,
+      mediaId: args.mediaId ? (args.mediaId as Id<"_storage">) : undefined,
+      mediaUrl: args.mediaUrl?.trim() || undefined,
+      isPublished: args.isPublished ?? false,
+      order,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+export const updateGalleryItem = mutation({
+  args: {
+    id: v.id("gallery"),
+    title: v.optional(v.string()),
+    kind: v.optional(v.union(v.literal("image"), v.literal("video"))),
+    mediaId: v.optional(v.string()),
+    mediaUrl: v.optional(v.string()),
+    isPublished: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const existing = await ctx.db.get(args.id);
+    if (!existing) throw new Error("That gallery item no longer exists.");
+
+    const patch: Partial<Doc<"gallery">> = { updatedAt: Date.now() };
+    if (args.title !== undefined) {
+      const title = args.title.trim();
+      if (!title) throw new Error("Add a title for this gallery item.");
+      patch.title = title;
+    }
+    if (args.kind !== undefined) patch.kind = args.kind;
+
+    const nextMediaId =
+      args.mediaId !== undefined
+        ? args.mediaId
+          ? (args.mediaId as Id<"_storage">)
+          : undefined
+        : existing.mediaId;
+    const nextMediaUrl =
+      args.mediaUrl !== undefined
+        ? args.mediaUrl.trim() || undefined
+        : existing.mediaUrl;
+    if (!nextMediaId && !nextMediaUrl) {
+      throw new Error(
+        (patch.kind ?? existing.kind) === "image"
+          ? "Add a photo."
+          : "Add a video.",
+      );
+    }
+
+    if (args.mediaId !== undefined) {
+      if (args.mediaId) {
+        const nextMediaId = args.mediaId as Id<"_storage">;
+        if (existing.mediaId && existing.mediaId !== nextMediaId) {
+          await deleteStorageFile(ctx, existing.mediaId);
+        }
+        patch.mediaId = nextMediaId;
+      } else {
+        await deleteStorageFile(ctx, existing.mediaId);
+        patch.mediaId = undefined;
+      }
+    }
+    if (args.mediaUrl !== undefined) patch.mediaUrl = args.mediaUrl.trim() || undefined;
+    if (args.isPublished !== undefined) patch.isPublished = args.isPublished;
+
+    await ctx.db.patch(args.id, patch);
+  },
+});
+
+export const deleteGalleryItem = mutation({
+  args: { id: v.id("gallery") },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const item = await ctx.db.get(args.id);
+    if (!item) return;
+    await deleteStorageFile(ctx, item.mediaId);
+    await ctx.db.delete(args.id);
+  },
+});
+
+export const reorderGallery = mutation({
+  args: { ids: v.array(v.id("gallery")) },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    for (const [index, id] of args.ids.entries()) {
+      await ctx.db.patch(id, { order: index, updatedAt: Date.now() });
+    }
+  },
+});
+
 /** Create or update the single hospital information record. */
 export const saveHospitalInfo = mutation({
   args: {
@@ -799,6 +1060,8 @@ async function insertStarterContent(ctx: MutationCtx) {
     doctors: 0,
     management: 0,
     events: 0,
+    partners: 0,
+    gallery: 0,
   };
 
     const existingInfo = await ctx.db.query("hospitalInfo").first();
@@ -1089,6 +1352,88 @@ async function insertStarterContent(ctx: MutationCtx) {
       }
     }
 
+    const partners = await ctx.db
+      .query("partners")
+      .withIndex("by_order")
+      .collect();
+    if (partners.length === 0) {
+      const starterPartners = [
+        {
+          name: "Ghana Health Service",
+          logoUrl:
+            "https://ui-avatars.com/api/?name=GHS&background=1d4b38&color=ffffff&size=256&bold=true",
+        },
+        {
+          name: "Eastern Regional Health Directorate",
+          logoUrl:
+            "https://ui-avatars.com/api/?name=ERHD&background=8c1d22&color=ffffff&size=256&bold=true",
+        },
+        {
+          name: "Kwahu East District Assembly",
+          logoUrl:
+            "https://ui-avatars.com/api/?name=KEDA&background=b8862b&color=1d2b24&size=256&bold=true",
+        },
+        {
+          name: "World Health Organization",
+          logoUrl:
+            "https://ui-avatars.com/api/?name=WHO&background=0b5c8a&color=ffffff&size=256&bold=true",
+        },
+      ];
+
+      for (const [index, partner] of starterPartners.entries()) {
+        await ctx.db.insert("partners", {
+          ...partner,
+          order: index,
+          isPublished: true,
+          updatedAt: Date.now(),
+        });
+        created.partners += 1;
+      }
+    }
+
+    const gallery = await ctx.db
+      .query("gallery")
+      .withIndex("by_order")
+      .collect();
+    if (gallery.length === 0) {
+      const starterGallery = [
+        {
+          title: "Outpatient department, morning clinic",
+          kind: "image" as const,
+          mediaUrl:
+            "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=1400&q=80",
+        },
+        {
+          title: "Maternal health team at work",
+          kind: "image" as const,
+          mediaUrl:
+            "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=1400&q=80",
+        },
+        {
+          title: "Community screening at Atibie",
+          kind: "image" as const,
+          mediaUrl:
+            "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=1400&q=80",
+        },
+        {
+          title: "A short tour of our hospital",
+          kind: "video" as const,
+          mediaUrl:
+            "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
+        },
+      ];
+
+      for (const [index, item] of starterGallery.entries()) {
+        await ctx.db.insert("gallery", {
+          ...item,
+          order: index,
+          isPublished: true,
+          updatedAt: Date.now(),
+        });
+        created.gallery += 1;
+      }
+    }
+
   return created;
 }
 
@@ -1113,3 +1458,4 @@ export const seedDemoContent = internalMutation({
   args: {},
   handler: async (ctx) => await insertStarterContent(ctx),
 });
+

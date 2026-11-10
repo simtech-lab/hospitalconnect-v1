@@ -24,7 +24,7 @@ function HeroCta({
   const className = cn(
     "inline-flex h-11 items-center justify-center gap-2 rounded-full px-6 text-[13px] font-semibold transition-colors",
     tone === "solid"
-      ? "bg-accent text-accent-foreground hover:bg-accent/90"
+      ? "bg-brand text-brand-foreground hover:bg-brand/90"
       : "border border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10",
   );
 
@@ -129,8 +129,8 @@ export function HeroSlider({
             transition={{ duration: 0.55, delay: 0.15 }}
             className="max-w-2xl text-primary-foreground"
           >
-            <span className="inline-flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.28em] text-accent">
-              <span className="h-px w-8 bg-accent/80" />
+            <span className="inline-flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.28em] text-brand-soft">
+              <span className="h-px w-8 bg-brand-soft/80" />
               {eyebrow}
             </span>
 
@@ -166,7 +166,7 @@ export function HeroSlider({
                   className={cn(
                     "h-1 rounded-full transition-all",
                     slideIndex === activeIndex
-                      ? "w-7 bg-accent"
+                      ? "w-7 bg-brand-soft"
                       : "w-3 bg-primary-foreground/35 hover:bg-primary-foreground/60",
                   )}
                 />

@@ -43,19 +43,19 @@ export function SiteHeader({
       <div className="border-b border-primary/20 bg-primary text-primary-foreground">
         <div className="page-shell flex h-9 items-center justify-between gap-4 text-[10px] font-medium uppercase tracking-[0.18em] sm:text-[11px]">
           <span className="flex min-w-0 items-center gap-2">
-            <MapPin className="size-3.5 shrink-0 text-accent" />
+            <MapPin className="size-3.5 shrink-0 text-brand-soft" />
             <span className="truncate">
               {info?.address?.trim() || "Atibie · Eastern Region · Ghana"}
             </span>
           </span>
           {topRight ? (
             <span className="hidden items-center gap-2 sm:flex">
-              <topRight.icon className="size-3.5 shrink-0 text-accent" />
+              <topRight.icon className="size-3.5 shrink-0 text-brand-soft" />
               <span className="truncate">{topRight.text}</span>
             </span>
           ) : (
             <span className="hidden items-center gap-2 sm:flex">
-              <span className="size-1.5 rounded-full bg-accent" />
+              <span className="size-1.5 rounded-full bg-brand-soft" />
               Official hospital website
             </span>
           )}
@@ -76,7 +76,7 @@ export function SiteHeader({
             </span>
           </Link>
 
-          <nav className="hidden items-center gap-7 lg:flex">
+          <nav className="hidden items-center gap-7 xl:flex">
             {navItems.map((item) => (
               <a
                 key={item.href}
@@ -93,7 +93,7 @@ export function SiteHeader({
               asChild
               variant="outline"
               size="sm"
-              className="hidden h-9 rounded-full border-primary/25 px-4 text-[13px] lg:inline-flex"
+              className="hidden h-9 rounded-full border-primary/25 px-4 text-[13px] xl:inline-flex"
             >
               <Link to={isAdmin ? "/dashboard" : "/auth?returnTo=/dashboard"}>
                 {isAdmin ? "Admin console" : "Administrator sign in"}
@@ -106,7 +106,7 @@ export function SiteHeader({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="size-10 lg:hidden"
+                  className="size-10 xl:hidden"
                   aria-label="Open menu"
                 >
                   <Menu className="size-5" />

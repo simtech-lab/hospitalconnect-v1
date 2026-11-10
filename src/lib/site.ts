@@ -8,6 +8,8 @@ export type SiteService = AdminSite["services"][number];
 export type SiteDoctor = AdminSite["doctors"][number];
 export type ManagementMember = AdminSite["management"][number];
 export type SiteEvent = AdminSite["events"][number];
+export type SitePartner = AdminSite["partners"][number];
+export type SiteGalleryItem = AdminSite["gallery"][number];
 export type HospitalInfo = NonNullable<AdminSite["info"]>;
 
 export const DEFAULT_HOSPITAL_NAME = "Kwahu Government Hospital";

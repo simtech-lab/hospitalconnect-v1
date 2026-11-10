@@ -1,5 +1,7 @@
 import { EventsSection } from "@/components/site/EventsSection";
+import { GallerySection } from "@/components/site/GallerySection";
 import { HeroSlider } from "@/components/site/HeroSlider";
+import { PartnersSection } from "@/components/site/PartnersSection";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { SiteHeader, type NavItem } from "@/components/site/SiteHeader";
 import { ServiceIcon } from "@/components/site/ServiceIcon";
@@ -34,6 +36,7 @@ const SECTION_NAV: NavItem[] = [
   { label: "Services", href: "#services" },
   { label: "Our team", href: "#team" },
   { label: "Events", href: "#events" },
+  { label: "Gallery", href: "#gallery" },
   { label: "Visit us", href: "#visit" },
 ];
 
@@ -124,7 +127,7 @@ function AboutSection({ info }: { info: HospitalInfo | null }) {
         <div className="space-y-4">
           <div className="relative overflow-hidden rounded-2xl border border-border/80 bg-card p-6 sm:p-7">
             <div className="flex items-center justify-between gap-4">
-              <span className="grid size-11 place-items-center rounded-full bg-accent/20 text-accent-foreground">
+              <span className="grid size-11 place-items-center rounded-full bg-brand/10 text-brand">
                 <Compass className="size-5" />
               </span>
               <span className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground/60">
@@ -196,7 +199,7 @@ function ServicesSection({ services }: { services: SiteService[] }) {
                 <span className="absolute right-5 top-5 font-mono text-[10px] tracking-[0.2em] text-muted-foreground/50">
                   {String(index + 1).padStart(2, "0")}
                 </span>
-                <span className="grid size-11 place-items-center rounded-full bg-accent/20 text-accent-foreground">
+                <span className="grid size-11 place-items-center rounded-full bg-brand/10 text-brand">
                   <ServiceIcon name={service.icon} className="size-5" />
                 </span>
                 <h3 className="mt-5 font-display text-2xl tracking-tight">
@@ -242,7 +245,7 @@ function VisitSection({ info }: { info: HospitalInfo | null }) {
       >
         <div className="grid lg:grid-cols-[1.1fr_0.9fr]">
           <div className="p-7 sm:p-10 lg:p-12">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.28em] text-accent">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.28em] text-brand-soft">
               Plan your visit
             </span>
             <h2 className="mt-4 max-w-md font-display text-4xl leading-[1.05] tracking-tight text-balance sm:text-5xl">
@@ -278,7 +281,7 @@ function VisitSection({ info }: { info: HospitalInfo | null }) {
             <ul className="mt-7 space-y-5 text-sm">
               {address && (
                 <li className="flex items-start gap-3">
-                  <MapPin className="mt-0.5 size-4 shrink-0 text-accent" />
+                  <MapPin className="mt-0.5 size-4 shrink-0 text-brand-soft" />
                   <span className="leading-6 text-primary-foreground/85">
                     {address}
                   </span>
@@ -286,7 +289,7 @@ function VisitSection({ info }: { info: HospitalInfo | null }) {
               )}
               {phone && (
                 <li className="flex items-start gap-3">
-                  <Phone className="mt-0.5 size-4 shrink-0 text-accent" />
+                  <Phone className="mt-0.5 size-4 shrink-0 text-brand-soft" />
                   <a
                     href={`tel:${phone.replace(/\s+/g, "")}`}
                     className="leading-6 text-primary-foreground/85 hover:text-primary-foreground"
@@ -297,7 +300,7 @@ function VisitSection({ info }: { info: HospitalInfo | null }) {
               )}
               {emergency && emergency !== phone && (
                 <li className="flex items-start gap-3">
-                  <Phone className="mt-0.5 size-4 shrink-0 text-accent" />
+                  <Phone className="mt-0.5 size-4 shrink-0 text-brand-soft" />
                   <span className="leading-6 text-primary-foreground/85">
                     <span className="font-medium text-primary-foreground">
                       Emergency
@@ -314,7 +317,7 @@ function VisitSection({ info }: { info: HospitalInfo | null }) {
               )}
               {email && (
                 <li className="flex items-start gap-3">
-                  <Mail className="mt-0.5 size-4 shrink-0 text-accent" />
+                  <Mail className="mt-0.5 size-4 shrink-0 text-brand-soft" />
                   <a
                     href={`mailto:${email}`}
                     className="break-all leading-6 text-primary-foreground/85 hover:text-primary-foreground"
@@ -337,7 +340,7 @@ function VisitSection({ info }: { info: HospitalInfo | null }) {
                   href={mapsHref}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex h-10 items-center gap-2 rounded-full bg-accent px-5 text-[13px] font-semibold text-accent-foreground transition-colors hover:bg-accent/90"
+                  className="inline-flex h-10 items-center gap-2 rounded-full bg-brand px-5 text-[13px] font-semibold text-brand-foreground transition-colors hover:bg-brand/90"
                 >
                   Get directions
                   <ArrowUpRight className="size-4" />
@@ -370,6 +373,8 @@ export default function Landing() {
   const doctors = site?.doctors ?? [];
   const management = site?.management ?? [];
   const events = site?.events ?? [];
+  const partners = site?.partners ?? [];
+  const gallery = site?.gallery ?? [];
 
   const name = info?.name?.trim() || DEFAULT_HOSPITAL_NAME;
   const tagline = info?.tagline?.trim() || DEFAULT_TAGLINE;
@@ -379,7 +384,9 @@ export default function Landing() {
     services.length > 0 ||
     doctors.length > 0 ||
     management.length > 0 ||
-    events.length > 0;
+    events.length > 0 ||
+    partners.length > 0 ||
+    gallery.length > 0;
   const isAdmin = user?.role === "admin";
 
   const navItems: NavItem[] = hasContent ? SECTION_NAV : [];
@@ -471,6 +478,8 @@ export default function Landing() {
             <ServicesSection services={services} />
             <TeamSection doctors={doctors} management={management} />
             <EventsSection events={events} />
+            <PartnersSection partners={partners} />
+            <GallerySection items={gallery} />
             <VisitSection info={info} />
           </>
         ) : (
@@ -517,8 +526,8 @@ export default function Landing() {
                 Official information, straight from the hospital.
               </h2>
               <p className="mt-2 max-w-xl text-sm leading-7 text-muted-foreground">
-                Every slide, doctor profile, event and service detail on this
-                website is created and published by hospital administration.
+                Every slide, doctor profile, event, partner and gallery item on
+                this website is created and published by hospital administration.
               </p>
             </div>
             <Button asChild size="lg" className="shrink-0 rounded-full px-6">

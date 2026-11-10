@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-/** The hospital's brand mark: a care cross with an ochre ridge arc. */
+/** The hospital's brand mark: a care cross with a red ridge arc. */
 export function HospitalMark({ className }: { className?: string }) {
   return (
     <svg
@@ -22,7 +22,7 @@ export function HospitalMark({ className }: { className?: string }) {
         strokeWidth="3.5"
         strokeLinecap="round"
         fill="none"
-        className="text-accent"
+        className="text-brand-soft"
       />
     </svg>
   );

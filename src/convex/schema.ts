@@ -106,6 +106,27 @@ const schema = defineSchema(
       updatedAt: v.number(),
     }).index("by_starts", ["startsAt"]),
 
+    // Partner organisations shown in the public partners strip.
+    partners: defineTable({
+      name: v.string(),
+      logoId: v.optional(v.id("_storage")),
+      logoUrl: v.optional(v.string()),
+      order: v.number(),
+      isPublished: v.boolean(),
+      updatedAt: v.number(),
+    }).index("by_order", ["order"]),
+
+    // Public media gallery: titled photos and videos.
+    gallery: defineTable({
+      title: v.string(),
+      kind: v.union(v.literal("image"), v.literal("video")),
+      mediaId: v.optional(v.id("_storage")),
+      mediaUrl: v.optional(v.string()),
+      order: v.number(),
+      isPublished: v.boolean(),
+      updatedAt: v.number(),
+    }).index("by_order", ["order"]),
+
     // Single document holding the hospital profile, hours and contact details.
     hospitalInfo: defineTable({
       key: v.literal("main"),
