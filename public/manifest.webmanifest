@@ -8,9 +8,9 @@
   "theme_color": "#1d4b38",
   "icons": [
     {
-      "src": "/kwahu-mark.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "/hospital-logo.jpg",
+      "sizes": "720x720",
+      "type": "image/jpeg",
       "purpose": "any"
     }
   ]
