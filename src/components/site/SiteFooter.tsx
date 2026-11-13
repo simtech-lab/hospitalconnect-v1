@@ -1,19 +1,16 @@
 import type { HospitalInfo } from "@/lib/site";
 import { DEFAULT_HOSPITAL_NAME } from "@/lib/site";
-import { ArrowUpRight, Mail, MapPin, Phone } from "lucide-react";
+import { Mail, MapPin, Phone } from "lucide-react";
 import { Link } from "react-router";
 import { HospitalMark } from "./HospitalMark";
 
 export function SiteFooter({
   name = DEFAULT_HOSPITAL_NAME,
   info,
-  hasContent = true,
 }: {
   name?: string;
   info?: HospitalInfo | null;
-  hasContent?: boolean;
 }) {
-  const sectionHref = (hash: string) => (hasContent ? hash : "#information");
   const phone = info?.phone?.trim();
   const emergency = info?.emergencyLine?.trim();
   const email = info?.email?.trim();
@@ -45,69 +42,45 @@ export function SiteFooter({
             <p className="eyebrow">Explore</p>
             <ul className="mt-4 space-y-3 text-sm text-muted-foreground">
               <li>
-                <a
-                  href={sectionHref("#about")}
-                  className="transition-colors hover:text-primary"
-                >
+                <Link to="/about" className="transition-colors hover:text-primary">
                   About the hospital
-                </a>
+                </Link>
               </li>
               <li>
-                <a
-                  href={sectionHref("#services")}
-                  className="transition-colors hover:text-primary"
-                >
+                <Link to="/services" className="transition-colors hover:text-primary">
                   Departments & services
-                </a>
+                </Link>
               </li>
               <li>
-                <a
-                  href={sectionHref("#team")}
-                  className="transition-colors hover:text-primary"
-                >
+                <Link to="/team" className="transition-colors hover:text-primary">
                   Doctors & management
-                </a>
+                </Link>
               </li>
               <li>
-                <a
-                  href={sectionHref("#events")}
-                  className="transition-colors hover:text-primary"
-                >
+                <Link to="/events" className="transition-colors hover:text-primary">
                   Upcoming events
-                </a>
+                </Link>
               </li>
               <li>
                 <a
-                  href={sectionHref("#partners")}
+                  href="/#partners"
                   className="transition-colors hover:text-primary"
                 >
                   Our partners
                 </a>
               </li>
               <li>
-                <a
-                  href={sectionHref("#gallery")}
-                  className="transition-colors hover:text-primary"
-                >
-                  Photo & video gallery
-                </a>
+                <Link to="/gallery" className="transition-colors hover:text-primary">
+                  Event gallery
+                </Link>
               </li>
               <li>
                 <a
-                  href={sectionHref("#visit")}
+                  href="/#visit"
                   className="transition-colors hover:text-primary"
                 >
                   Plan your visit
                 </a>
-              </li>
-              <li>
-                <Link
-                  to="/auth?returnTo=/dashboard"
-                  className="inline-flex items-center gap-1 transition-colors hover:text-primary"
-                >
-                  Administrator sign in
-                  <ArrowUpRight className="size-3.5" />
-                </Link>
               </li>
             </ul>
           </div>

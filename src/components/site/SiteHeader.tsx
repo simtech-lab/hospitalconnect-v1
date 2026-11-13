@@ -7,11 +7,10 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { useAuth } from "@/hooks/use-auth";
 import type { HospitalInfo } from "@/lib/site";
 import { DEFAULT_HOSPITAL_NAME } from "@/lib/site";
 import { cn } from "@/lib/utils";
-import { ArrowUpRight, Clock, MapPin, Menu, Phone } from "lucide-react";
+import { Clock, MapPin, Menu, Phone } from "lucide-react";
 import { Link } from "react-router";
 import { useState } from "react";
 import { HospitalMark } from "./HospitalMark";
@@ -27,9 +26,7 @@ export function SiteHeader({
   info?: HospitalInfo | null;
   navItems: NavItem[];
 }) {
-  const { user } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
-  const isAdmin = user?.role === "admin";
 
   const emergency = info?.emergencyLine?.trim() || info?.phone?.trim();
   const topRight = info?.visitingHours?.trim()
@@ -77,30 +74,28 @@ export function SiteHeader({
           </Link>
 
           <nav className="hidden items-center gap-7 xl:flex">
-            {navItems.map((item) => (
-              <a
-                key={item.href}
-                href={item.href}
-                className="text-[15px] font-medium text-foreground/70 transition-colors hover:text-primary"
-              >
-                {item.label}
-              </a>
-            ))}
+            {navItems.map((item) =>
+              item.href.startsWith("/") ? (
+                <Link
+                  key={item.href}
+                  to={item.href}
+                  className="text-[15px] font-medium text-foreground/70 transition-colors hover:text-primary"
+                >
+                  {item.label}
+                </Link>
+              ) : (
+                <a
+                  key={item.href}
+                  href={item.href}
+                  className="text-[15px] font-medium text-foreground/70 transition-colors hover:text-primary"
+                >
+                  {item.label}
+                </a>
+              ),
+            )}
           </nav>
 
           <div className="flex items-center gap-2">
-            <Button
-              asChild
-              variant="outline"
-              size="sm"
-              className="hidden h-9 rounded-full border-primary/25 px-4 text-[13px] xl:inline-flex"
-            >
-              <Link to={isAdmin ? "/dashboard" : "/auth?returnTo=/dashboard"}>
-                {isAdmin ? "Admin console" : "Administrator sign in"}
-                <ArrowUpRight className="size-3.5" />
-              </Link>
-            </Button>
-
             <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
               <SheetTrigger asChild>
                 <Button
@@ -128,37 +123,45 @@ export function SiteHeader({
                 </SheetHeader>
 
                 <nav className="flex flex-col px-6 py-4">
-                  {navItems.map((item) => (
-                    <a
-                      key={item.href}
-                      href={item.href}
-                      onClick={() => setMenuOpen(false)}
-                      className={cn(
-                        "border-b border-border/60 py-4 font-display text-2xl tracking-tight",
-                        "transition-colors hover:text-primary",
-                      )}
-                    >
-                      {item.label}
-                    </a>
-                  ))}
+                  {navItems.map((item) =>
+                    item.href.startsWith("/") ? (
+                      <Link
+                        key={item.href}
+                        to={item.href}
+                        onClick={() => setMenuOpen(false)}
+                        className={cn(
+                          "border-b border-border/60 py-4 font-display text-2xl tracking-tight",
+                          "transition-colors hover:text-primary",
+                        )}
+                      >
+                        {item.label}
+                      </Link>
+                    ) : (
+                      <a
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setMenuOpen(false)}
+                        className={cn(
+                          "border-b border-border/60 py-4 font-display text-2xl tracking-tight",
+                          "transition-colors hover:text-primary",
+                        )}
+                      >
+                        {item.label}
+                      </a>
+                    ),
+                  )}
                 </nav>
 
-                <div className="mt-auto space-y-3 border-t p-6">
-                  <Button asChild className="w-full rounded-full">
-                    <Link to={isAdmin ? "/dashboard" : "/auth?returnTo=/dashboard"}>
-                      {isAdmin ? "Open admin console" : "Administrator sign in"}
-                      <ArrowUpRight className="size-4" />
-                    </Link>
-                  </Button>
-                  {emergency && (
+                {emergency && (
+                  <div className="mt-auto border-t p-6">
                     <a
                       href={`tel:${emergency.replace(/\s+/g, "")}`}
                       className="flex items-center justify-center gap-2 text-sm text-muted-foreground"
                     >
                       <Phone className="size-4" /> {emergency}
                     </a>
-                  )}
-                </div>
+                  </div>
+                )}
               </SheetContent>
             </Sheet>
           </div>

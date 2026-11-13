@@ -10,34 +10,42 @@ import { motion } from "framer-motion";
 import { Images, Play, Video } from "lucide-react";
 import { useState } from "react";
 
-export function GallerySection({ items }: { items: SiteGalleryItem[] }) {
+export function GallerySection({
+  items,
+  showHeading = true,
+}: {
+  items: SiteGalleryItem[];
+  showHeading?: boolean;
+}) {
   const [active, setActive] = useState<SiteGalleryItem | null>(null);
   const embedId =
     active?.kind === "video" ? youtubeId(active.src ?? "") : null;
 
   return (
     <section id="gallery" className="page-shell py-16 md:py-24">
-      <motion.div
-        initial={{ opacity: 0, y: 18 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, amount: 0.2 }}
-        transition={{ duration: 0.55 }}
-        className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between"
-      >
-        <div>
-          <span className="eyebrow">Photo & video gallery</span>
-          <h2 className="mt-4 max-w-xl font-display text-4xl leading-[1.04] tracking-tight text-balance sm:text-5xl">
-            Life and care at our hospital.
-          </h2>
-        </div>
-        <p className="max-w-sm text-sm leading-7 text-muted-foreground">
-          Moments from our wards, clinics and community programmes, published by
-          hospital administration.
-        </p>
-      </motion.div>
+      {showHeading && (
+        <motion.div
+          initial={{ opacity: 0, y: 18 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.2 }}
+          transition={{ duration: 0.55 }}
+          className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between"
+        >
+          <div>
+            <span className="eyebrow">Photo & video gallery</span>
+            <h2 className="mt-4 max-w-xl font-display text-4xl leading-[1.04] tracking-tight text-balance sm:text-5xl">
+              Life and care at our hospital.
+            </h2>
+          </div>
+          <p className="max-w-sm text-sm leading-7 text-muted-foreground">
+            Moments from our wards, clinics and community programmes, published by
+            hospital administration.
+          </p>
+        </motion.div>
+      )}
 
       {items.length > 0 ? (
-        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className={`${showHeading ? "mt-10" : ""} grid gap-4 sm:grid-cols-2 lg:grid-cols-3`}>
           {items.map((item, index) => {
             const isVideo = item.kind === "video";
             const poster = isVideo ? youtubeThumbnail(item.src ?? "") : null;
@@ -113,7 +121,7 @@ export function GallerySection({ items }: { items: SiteGalleryItem[] }) {
           })}
         </div>
       ) : (
-        <div className="mt-10 flex items-start gap-4 rounded-2xl border border-dashed border-border bg-card/60 p-6">
+        <div className={`${showHeading ? "mt-10" : ""} flex items-start gap-4 rounded-2xl border border-dashed border-border bg-card/60 p-6`}>
           <span className="grid size-10 shrink-0 place-items-center rounded-full bg-secondary text-primary">
             <Images className="size-5" />
           </span>

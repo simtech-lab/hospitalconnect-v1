@@ -15,35 +15,39 @@ function initials(name: string) {
 export function TeamSection({
   doctors,
   management,
+  showHeading = true,
 }: {
   doctors: SiteDoctor[];
   management: ManagementMember[];
+  showHeading?: boolean;
 }) {
   const hasTeam = doctors.length > 0 || management.length > 0;
 
   return (
     <section id="team" className="page-shell py-16 md:py-24">
-      <motion.div
-        initial={{ opacity: 0, y: 18 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, amount: 0.2 }}
-        transition={{ duration: 0.55 }}
-        className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between"
-      >
-        <div>
-          <span className="eyebrow">Our people</span>
-          <h2 className="mt-4 max-w-xl font-display text-4xl leading-[1.04] tracking-tight text-balance sm:text-5xl">
-            The team behind your care.
-          </h2>
-        </div>
-        <p className="max-w-sm text-sm leading-7 text-muted-foreground">
-          Meet the doctors and hospital leadership whose profiles are published
-          by hospital administration.
-        </p>
-      </motion.div>
+      {showHeading && (
+        <motion.div
+          initial={{ opacity: 0, y: 18 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.2 }}
+          transition={{ duration: 0.55 }}
+          className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between"
+        >
+          <div>
+            <span className="eyebrow">Our people</span>
+            <h2 className="mt-4 max-w-xl font-display text-4xl leading-[1.04] tracking-tight text-balance sm:text-5xl">
+              The team behind your care.
+            </h2>
+          </div>
+          <p className="max-w-sm text-sm leading-7 text-muted-foreground">
+            Meet the doctors and hospital leadership whose profiles are published
+            by hospital administration.
+          </p>
+        </motion.div>
+      )}
 
       {hasTeam ? (
-        <div className="mt-12 space-y-14">
+        <div className={`${showHeading ? "mt-12" : ""} space-y-14`}>
           {doctors.length > 0 && (
             <div>
               <div className="flex items-end justify-between gap-4 border-b border-border/70 pb-3">
@@ -153,7 +157,7 @@ export function TeamSection({
           )}
         </div>
       ) : (
-        <div className="mt-10 flex items-start gap-4 rounded-2xl border border-dashed border-border bg-card/60 p-6">
+        <div className={`${showHeading ? "mt-10" : ""} flex items-start gap-4 rounded-2xl border border-dashed border-border bg-card/60 p-6`}>
           <span className="grid size-10 shrink-0 place-items-center rounded-full bg-secondary text-primary">
             <UsersRound className="size-5" />
           </span>

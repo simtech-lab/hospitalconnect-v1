@@ -90,13 +90,13 @@ export function HeroSlider({
 
   return (
     <div
-      className="relative overflow-hidden rounded-[1.75rem] border border-border/70 bg-primary"
+      className="relative w-full overflow-hidden border-b border-border/70 bg-primary"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
     >
-      <div className="relative h-[540px] sm:h-[580px] lg:h-[645px]">
+      <div className="relative h-[calc(100svh-7rem)] min-h-[500px] max-h-[800px]">
         <AnimatePresence initial={false}>
           <motion.div
             key={activeSlide?._id ?? "fallback"}

@@ -17,7 +17,13 @@ function youtubeId(url: string) {
   return match?.[1] ?? null;
 }
 
-export function EventsSection({ events }: { events: SiteEvent[] }) {
+export function EventsSection({
+  events,
+  showHeading = true,
+}: {
+  events: SiteEvent[];
+  showHeading?: boolean;
+}) {
   const [active, setActive] = useState<SiteEvent | null>(null);
   const upcoming = useMemo(
     () =>
@@ -30,27 +36,29 @@ export function EventsSection({ events }: { events: SiteEvent[] }) {
   return (
     <section id="events" className="border-y border-border/70 bg-secondary/40">
       <div className="page-shell py-16 md:py-24">
-        <motion.div
-          initial={{ opacity: 0, y: 18 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.2 }}
-          transition={{ duration: 0.55 }}
-          className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between"
-        >
-          <div>
-            <span className="eyebrow">What's happening</span>
-            <h2 className="mt-4 max-w-xl font-display text-4xl leading-[1.04] tracking-tight text-balance sm:text-5xl">
-              Upcoming events at the hospital.
-            </h2>
-          </div>
-          <p className="max-w-sm text-sm leading-7 text-muted-foreground">
-            Outreach, screenings and community programmes. Every event is
-            published by hospital administration.
-          </p>
-        </motion.div>
+        {showHeading && (
+          <motion.div
+            initial={{ opacity: 0, y: 18 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.2 }}
+            transition={{ duration: 0.55 }}
+            className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between"
+          >
+            <div>
+              <span className="eyebrow">What's happening</span>
+              <h2 className="mt-4 max-w-xl font-display text-4xl leading-[1.04] tracking-tight text-balance sm:text-5xl">
+                Upcoming events at the hospital.
+              </h2>
+            </div>
+            <p className="max-w-sm text-sm leading-7 text-muted-foreground">
+              Outreach, screenings and community programmes. Every event is
+              published by hospital administration.
+            </p>
+          </motion.div>
+        )}
 
         {upcoming.length > 0 ? (
-          <div className="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          <div className={`${showHeading ? "mt-10" : ""} grid gap-5 md:grid-cols-2 lg:grid-cols-3`}>
             {upcoming.map((event, index) => {
               const date = eventDateParts(event.startsAt);
               return (
@@ -114,7 +122,7 @@ export function EventsSection({ events }: { events: SiteEvent[] }) {
             })}
           </div>
         ) : (
-          <div className="mt-10 flex items-start gap-4 rounded-2xl border border-dashed border-border bg-card/60 p-6">
+          <div className={`${showHeading ? "mt-10" : ""} flex items-start gap-4 rounded-2xl border border-dashed border-border bg-card/60 p-6`}>
             <span className="grid size-10 shrink-0 place-items-center rounded-full bg-card text-primary">
               <CalendarDays className="size-5" />
             </span>
