@@ -127,6 +127,29 @@ const schema = defineSchema(
       updatedAt: v.number(),
     }).index("by_order", ["order"]),
 
+    // Appointment requests submitted by patients from the public About page.
+    appointments: defineTable({
+      name: v.string(),
+      phone: v.string(),
+      email: v.optional(v.string()),
+      service: v.optional(v.string()),
+      preferredDate: v.string(),
+      preferredTime: v.union(
+        v.literal("morning"),
+        v.literal("afternoon"),
+        v.literal("anytime"),
+      ),
+      reason: v.optional(v.string()),
+      status: v.union(
+        v.literal("new"),
+        v.literal("contacted"),
+        v.literal("scheduled"),
+        v.literal("closed"),
+      ),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+    }).index("by_created", ["createdAt"]),
+
     // Single document holding the hospital profile, hours and contact details.
     hospitalInfo: defineTable({
       key: v.literal("main"),

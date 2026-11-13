@@ -24,6 +24,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -58,6 +65,7 @@ import {
   ArrowDown,
   ArrowUp,
   Building2,
+  CalendarClock,
   CalendarDays,
   Camera,
   Check,
@@ -74,6 +82,7 @@ import {
   MapPin,
   Menu,
   Pencil,
+  Phone,
   Plus,
   ShieldCheck,
   Sparkles,
@@ -86,9 +95,12 @@ import {
   Video,
   type LucideIcon,
 } from "lucide-react";
+import type { FunctionReturnType } from "convex/server";
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
+
+type Appointment = FunctionReturnType<typeof api.appointments.list>[number];
 
 type Tab =
   | "overview"
@@ -98,6 +110,7 @@ type Tab =
   | "doctors"
   | "management"
   | "events"
+  | "appointments"
   | "partners"
   | "gallery"
   | "team";
@@ -149,6 +162,12 @@ const TABS: {
     label: "Events",
     hint: "Upcoming events, flyers and media",
     icon: CalendarDays,
+  },
+  {
+    value: "appointments",
+    label: "Appointments",
+    hint: "Requests submitted from the website",
+    icon: CalendarClock,
   },
   {
     value: "partners",
@@ -206,6 +225,7 @@ function Console({
   displayName?: string | null;
 }) {
   const site = useQuery(api.content.getAdminSite);
+  const appointments = useQuery(api.appointments.list);
   const { signOut } = useAuth();
   const navigate = useNavigate();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -219,6 +239,7 @@ function Console({
     doctors: site?.doctors.length,
     management: site?.management.length,
     events: site?.events.length,
+    appointments: appointments?.length,
     partners: site?.partners.length,
     gallery: site?.gallery.length,
   };
@@ -373,6 +394,12 @@ function Console({
                 <ManagementTab members={site.management} />
               )}
               {tab === "events" && <EventsTab events={site.events} />}
+              {tab === "appointments" && (
+                <AppointmentsTab
+                  appointments={appointments ?? []}
+                  loading={appointments === undefined}
+                />
+              )}
               {tab === "partners" && <PartnersTab partners={site.partners} />}
               {tab === "gallery" && <GalleryTab items={site.gallery} />}
               {tab === "team" && <TeamTab />}
@@ -380,6 +407,280 @@ function Console({
           )}
         </main>
       </div>
+    </div>
+  );
+}
+
+const APPOINTMENT_STATUS: Record<
+  Appointment["status"],
+  { label: string; className: string }
+> = {
+  new: { label: "New", className: "border-brand/25 bg-brand/10 text-brand" },
+  contacted: {
+    label: "Contacted",
+    className: "border-border bg-secondary text-secondary-foreground",
+  },
+  scheduled: {
+    label: "Scheduled",
+    className: "border-primary/25 bg-primary/10 text-primary",
+  },
+  closed: {
+    label: "Closed",
+    className: "border-border bg-muted text-muted-foreground",
+  },
+};
+
+const APPOINTMENT_TIME: Record<Appointment["preferredTime"], string> = {
+  morning: "Morning · 8am – 12pm",
+  afternoon: "Afternoon · 12pm – 5pm",
+  anytime: "Any time",
+};
+
+function formatAppointmentDate(value: string) {
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function AppointmentsTab({
+  appointments,
+  loading,
+}: {
+  appointments: Appointment[];
+  loading: boolean;
+}) {
+  const updateStatus = useMutation(api.appointments.updateStatus);
+  const removeAppointment = useMutation(api.appointments.remove);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<Appointment | null>(null);
+
+  const newCount = appointments.filter((item) => item.status === "new").length;
+  const scheduledCount = appointments.filter(
+    (item) => item.status === "scheduled",
+  ).length;
+
+  async function changeStatus(
+    appointment: Appointment,
+    status: Appointment["status"],
+  ) {
+    setBusyId(appointment._id);
+    try {
+      await updateStatus({ id: appointment._id, status });
+      toast.success(`Marked as ${APPOINTMENT_STATUS[status].label.toLowerCase()}.`);
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not update this appointment.",
+      );
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleting) return;
+    try {
+      await removeAppointment({ id: deleting._id });
+      toast.success("Appointment request deleted.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not delete this request.",
+      );
+    } finally {
+      setDeleting(null);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="font-display text-3xl tracking-tight sm:text-4xl">
+          Appointment requests
+        </h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+          Requests submitted from the About page. Call the patient to confirm a
+          time, then update the request status here.
+        </p>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-2xl border border-border/80 bg-card p-5">
+          <p className="eyebrow text-[10px]">Total requests</p>
+          <p className="mt-2 font-display text-3xl tracking-tight">
+            {appointments.length}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-border/80 bg-card p-5">
+          <p className="eyebrow text-[10px]">Awaiting contact</p>
+          <p className="mt-2 font-display text-3xl tracking-tight text-brand">
+            {newCount}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-border/80 bg-card p-5">
+          <p className="eyebrow text-[10px]">Scheduled</p>
+          <p className="mt-2 font-display text-3xl tracking-tight text-primary">
+            {scheduledCount}
+          </p>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex min-h-[30vh] items-center justify-center gap-3 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" />
+          Loading appointment requests…
+        </div>
+      ) : appointments.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center">
+          <span className="mx-auto grid size-12 place-items-center rounded-full bg-secondary text-primary">
+            <CalendarClock className="size-5" />
+          </span>
+          <p className="mt-4 font-display text-2xl tracking-tight">
+            No appointment requests yet
+          </p>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+            New requests from the public About page will appear here.
+          </p>
+        </div>
+      ) : (
+        <ul className="space-y-3">
+          {appointments.map((appointment) => (
+            <li
+              key={appointment._id}
+              className="rounded-2xl border border-border/80 bg-card p-5"
+            >
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="font-display text-2xl leading-tight tracking-tight">
+                      {appointment.name}
+                    </h2>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "rounded-full text-[10px]",
+                        APPOINTMENT_STATUS[appointment.status].className,
+                      )}
+                    >
+                      {APPOINTMENT_STATUS[appointment.status].label}
+                    </Badge>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Requested{" "}
+                    {new Date(appointment.createdAt).toLocaleString("en-GB", {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    })}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 sm:shrink-0">
+                  <Select
+                    value={appointment.status}
+                    onValueChange={(value) =>
+                      changeStatus(
+                        appointment,
+                        value as Appointment["status"],
+                      )
+                    }
+                    disabled={busyId === appointment._id}
+                  >
+                    <SelectTrigger className="h-9 w-[150px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(APPOINTMENT_STATUS) as Appointment["status"][]).map(
+                        (status) => (
+                          <SelectItem key={status} value={status}>
+                            {APPOINTMENT_STATUS[status].label}
+                          </SelectItem>
+                        ),
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="size-9 text-muted-foreground hover:text-destructive"
+                    aria-label={`Delete request from ${appointment.name}`}
+                    onClick={() => setDeleting(appointment)}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+                <a
+                  href={`tel:${appointment.phone.replace(/\s+/g, "")}`}
+                  className="flex items-center gap-2 hover:text-primary"
+                >
+                  <Phone className="size-4 shrink-0 text-primary" />
+                  {appointment.phone}
+                </a>
+                {appointment.email ? (
+                  <a
+                    href={`mailto:${appointment.email}`}
+                    className="flex min-w-0 items-center gap-2 hover:text-primary"
+                  >
+                    <Mail className="size-4 shrink-0 text-primary" />
+                    <span className="truncate">{appointment.email}</span>
+                  </a>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <Mail className="size-4 shrink-0 text-primary/50" />
+                    No email provided
+                  </span>
+                )}
+                <span className="flex items-center gap-2">
+                  <CalendarClock className="size-4 shrink-0 text-primary" />
+                  {formatAppointmentDate(appointment.preferredDate)} ·{" "}
+                  {APPOINTMENT_TIME[appointment.preferredTime]}
+                </span>
+                <span className="flex items-center gap-2">
+                  <Stethoscope className="size-4 shrink-0 text-primary" />
+                  {appointment.service || "General outpatient"}
+                </span>
+              </div>
+
+              {appointment.reason && (
+                <p className="mt-4 whitespace-pre-line rounded-xl bg-secondary/40 p-4 text-sm leading-6 text-muted-foreground">
+                  {appointment.reason}
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <AlertDialog
+        open={deleting !== null}
+        onOpenChange={(open) => !open && setDeleting(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this request?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The appointment request from {deleting?.name ?? "this patient"} will
+              be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep request</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>
+              Delete request
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
