@@ -14,7 +14,7 @@ function initials(name: string) {
 export function PartnersSection({ partners }: { partners: SitePartner[] }) {
   return (
     <section id="partners" className="border-y border-border/70">
-      <div className="page-shell py-14 md:py-20">
+      <div className="page-shell py-10 sm:py-14 md:py-20">
         <motion.div
           initial={{ opacity: 0, y: 18 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -35,7 +35,7 @@ export function PartnersSection({ partners }: { partners: SitePartner[] }) {
         </motion.div>
 
         {partners.length > 0 ? (
-          <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="mt-8 grid grid-cols-2 gap-3 md:mt-10 sm:grid-cols-3 lg:grid-cols-4">
             {partners.map((partner, index) => (
               <motion.div
                 key={partner._id}
@@ -66,7 +66,7 @@ export function PartnersSection({ partners }: { partners: SitePartner[] }) {
             ))}
           </div>
         ) : (
-          <div className="mt-10 flex items-start gap-4 rounded-2xl border border-dashed border-border bg-card/60 p-6">
+          <div className="mt-8 flex items-start gap-4 rounded-2xl border border-dashed border-border bg-card/60 p-6 md:mt-10">
             <span className="grid size-10 shrink-0 place-items-center rounded-full bg-secondary text-primary">
               <Handshake className="size-5" />
             </span>

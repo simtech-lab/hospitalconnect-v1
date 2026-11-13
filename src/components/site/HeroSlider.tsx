@@ -96,7 +96,7 @@ export function HeroSlider({
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
     >
-      <div className="relative h-[calc(100svh-7rem)] min-h-[500px] max-h-[800px]">
+      <div className="relative h-[calc(100svh-7rem)] min-h-[460px] max-h-[720px]">
         <AnimatePresence initial={false}>
           <motion.div
             key={activeSlide?._id ?? "fallback"}
@@ -121,7 +121,7 @@ export function HeroSlider({
         <div className="absolute inset-0 bg-gradient-to-t from-primary/90 via-primary/10 to-primary/25" />
         <div className="ridge-pattern absolute inset-0 opacity-40" />
 
-        <div className="absolute inset-x-0 bottom-0 z-10 px-6 pb-28 sm:px-10 sm:pb-20 lg:px-14 lg:pb-16">
+        <div className="absolute inset-x-0 bottom-0 z-10 px-4 pb-24 sm:px-10 sm:pb-20 lg:px-14 lg:pb-16">
           <motion.div
             key={`copy-${activeSlide?._id ?? "fallback"}`}
             initial={{ opacity: 0, y: 14 }}
@@ -134,17 +134,17 @@ export function HeroSlider({
               {eyebrow}
             </span>
 
-            <h1 className="mt-5 font-display text-[2.9rem] leading-[0.97] tracking-tight text-balance sm:text-6xl lg:text-[4.5rem]">
+            <h1 className="mt-4 font-display text-[2.65rem] leading-[0.97] tracking-tight text-balance sm:mt-5 sm:text-6xl lg:text-[4.5rem]">
               {title}
             </h1>
 
             {subtitle && (
-              <p className="mt-5 max-w-xl text-sm leading-7 text-primary-foreground/80 sm:text-[15px] sm:leading-8">
+              <p className="mt-4 max-w-xl text-sm leading-7 text-primary-foreground/80 sm:mt-5 sm:text-[15px] sm:leading-8">
                 {subtitle}
               </p>
             )}
 
-            <div className="mt-8 flex flex-wrap gap-3">
+            <div className="mt-7 flex flex-wrap gap-3 sm:mt-8">
               <HeroCta href={ctaHref} label={ctaLabel} tone="solid" />
               {secondaryHref && (
                 <HeroCta href={secondaryHref} label="Our services" tone="ghost" />
@@ -153,7 +153,7 @@ export function HeroSlider({
           </motion.div>
         </div>
 
-        <div className="absolute bottom-5 right-5 z-20 flex items-center gap-3 sm:bottom-8 sm:right-8">
+        <div className="absolute bottom-4 right-4 z-20 flex items-center gap-3 sm:bottom-8 sm:right-8">
           {count > 1 && (
             <div className="flex items-center gap-1.5">
               {slides.map((slide, slideIndex) => (

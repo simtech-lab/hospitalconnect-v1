@@ -101,7 +101,7 @@ function VisitSection({ info }: { info: HospitalInfo | null }) {
     : null;
 
   return (
-    <section id="visit" className="page-shell py-16 md:py-24">
+    <section id="visit" className="page-shell py-12 sm:py-16 md:py-24">
       <motion.div
         {...reveal}
         className="overflow-hidden rounded-[2rem] border border-primary/30 bg-primary text-primary-foreground"
@@ -286,7 +286,7 @@ export default function Landing() {
           secondaryHref={hasContent ? "#services" : undefined}
         />
 
-        <section className="page-shell mt-5 grid gap-3 sm:grid-cols-3">
+        <section className="page-shell mt-4 grid gap-3 sm:mt-5 sm:grid-cols-3">
           <QuickAction
             href={hasContent ? "#visit" : "#information"}
             audience="For patients & visitors"
@@ -317,8 +317,8 @@ export default function Landing() {
         {hasContent ? (
           <>
             {facts.length > 1 && (
-              <section className="mt-14 border-y border-border/70 bg-secondary/35">
-                <div className="page-shell grid grid-cols-2 gap-8 py-10 md:grid-cols-4 md:divide-x md:divide-border/70">
+              <section className="mt-10 border-y border-border/70 bg-secondary/35 md:mt-14">
+                <div className="page-shell grid grid-cols-2 gap-8 py-8 md:grid-cols-4 md:divide-x md:divide-border/70 md:py-10">
                   {facts.map((fact) => (
                     <div key={fact.label} className="md:px-8 md:first:pl-0">
                       <p className="font-display text-4xl leading-none tracking-tight text-primary sm:text-5xl">
@@ -340,7 +340,7 @@ export default function Landing() {
             <VisitSection info={info} />
           </>
         ) : (
-          <section id="information" className="page-shell py-16 md:py-24">
+          <section id="information" className="page-shell py-12 sm:py-16 md:py-24">
             <motion.div
               {...reveal}
               className="grid gap-10 rounded-[2rem] border border-border/80 bg-card p-8 sm:p-12 lg:grid-cols-[1.15fr_0.85fr] lg:items-center"
@@ -368,8 +368,8 @@ export default function Landing() {
           </section>
         )}
 
-        <section className="page-shell pb-16 pt-4 md:pb-24">
-          <div className="flex flex-col gap-6 rounded-3xl border border-border/80 bg-card p-8 sm:flex-row sm:items-center sm:justify-between sm:p-10">
+        <section className="page-shell pb-12 pt-4 sm:pb-16 md:pb-24">
+          <div className="flex flex-col gap-6 rounded-3xl border border-border/80 bg-card p-6 sm:flex-row sm:items-center sm:justify-between sm:p-10">
             <div>
               <span className="eyebrow">Explore the hospital</span>
               <h2 className="mt-3 max-w-xl font-display text-3xl leading-tight tracking-tight sm:text-4xl">

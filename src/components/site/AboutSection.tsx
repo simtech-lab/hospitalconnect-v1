@@ -17,8 +17,8 @@ export function AboutSection({
   showHeading?: boolean;
 }) {
   return (
-    <section id="about" className="page-shell py-16 md:py-24">
-      <motion.div {...reveal} className="grid gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
+    <section id="about" className="page-shell py-12 sm:py-16 md:py-24">
+      <motion.div {...reveal} className="grid gap-8 md:gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
         <div>
           {showHeading && (
             <>

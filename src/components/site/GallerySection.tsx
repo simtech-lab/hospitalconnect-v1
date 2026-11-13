@@ -22,7 +22,7 @@ export function GallerySection({
     active?.kind === "video" ? youtubeId(active.src ?? "") : null;
 
   return (
-    <section id="gallery" className="page-shell py-16 md:py-24">
+    <section id="gallery" className="page-shell py-12 sm:py-16 md:py-24">
       {showHeading && (
         <motion.div
           initial={{ opacity: 0, y: 18 }}
@@ -45,7 +45,7 @@ export function GallerySection({
       )}
 
       {items.length > 0 ? (
-        <div className={`${showHeading ? "mt-10" : ""} grid gap-4 sm:grid-cols-2 lg:grid-cols-3`}>
+        <div className={`${showHeading ? "mt-8 md:mt-10" : ""} grid gap-4 sm:grid-cols-2 lg:grid-cols-3`}>
           {items.map((item, index) => {
             const isVideo = item.kind === "video";
             const poster = isVideo ? youtubeThumbnail(item.src ?? "") : null;

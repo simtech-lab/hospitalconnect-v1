@@ -35,7 +35,7 @@ export function EventsSection({
 
   return (
     <section id="events" className="border-y border-border/70 bg-secondary/40">
-      <div className="page-shell py-16 md:py-24">
+      <div className="page-shell py-12 sm:py-16 md:py-24">
         {showHeading && (
           <motion.div
             initial={{ opacity: 0, y: 18 }}
@@ -58,7 +58,7 @@ export function EventsSection({
         )}
 
         {upcoming.length > 0 ? (
-          <div className={`${showHeading ? "mt-10" : ""} grid gap-5 md:grid-cols-2 lg:grid-cols-3`}>
+          <div className={`${showHeading ? "mt-8 md:mt-10" : ""} grid gap-5 md:grid-cols-2 lg:grid-cols-3`}>
             {upcoming.map((event, index) => {
               const date = eventDateParts(event.startsAt);
               return (

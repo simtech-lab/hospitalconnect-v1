@@ -18,10 +18,10 @@ export function SiteFooter({
     info?.address?.trim() || "Atibie, Eastern Region, Ghana";
 
   return (
-    <footer className="mt-8">
+    <footer className="mt-4 sm:mt-8">
       <div className="ghana-stripe h-1 w-full" />
       <div className="border-t border-border/70 bg-secondary/30">
-        <div className="page-shell grid gap-10 py-14 md:grid-cols-[1.4fr_0.8fr_1fr]">
+        <div className="page-shell grid gap-8 py-10 sm:py-14 md:grid-cols-[1.4fr_0.8fr_1fr] md:gap-10">
           <div>
             <div className="flex items-center gap-3">
               <HospitalMark className="size-10" />

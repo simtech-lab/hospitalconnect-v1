@@ -24,7 +24,7 @@ export function TeamSection({
   const hasTeam = doctors.length > 0 || management.length > 0;
 
   return (
-    <section id="team" className="page-shell py-16 md:py-24">
+    <section id="team" className="page-shell py-12 sm:py-16 md:py-24">
       {showHeading && (
         <motion.div
           initial={{ opacity: 0, y: 18 }}
@@ -47,7 +47,7 @@ export function TeamSection({
       )}
 
       {hasTeam ? (
-        <div className={`${showHeading ? "mt-12" : ""} space-y-14`}>
+        <div className={`${showHeading ? "mt-8 md:mt-12" : ""} space-y-10 md:space-y-14`}>
           {doctors.length > 0 && (
             <div>
               <div className="flex items-end justify-between gap-4 border-b border-border/70 pb-3">

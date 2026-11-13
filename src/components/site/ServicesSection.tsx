@@ -21,7 +21,7 @@ export function ServicesSection({
       id="services"
       className="border-y border-border/70 bg-secondary/35"
     >
-      <div className="page-shell py-16 md:py-24">
+      <div className="page-shell py-12 sm:py-16 md:py-24">
         {showHeading && (
           <motion.div
             {...reveal}
@@ -41,7 +41,7 @@ export function ServicesSection({
         )}
 
         {services.length > 0 ? (
-          <div className={`${showHeading ? "mt-12" : ""} grid gap-4 sm:grid-cols-2 lg:grid-cols-3`}>
+          <div className={`${showHeading ? "mt-8 md:mt-12" : ""} grid gap-4 sm:grid-cols-2 lg:grid-cols-3`}>
             {services.map((service, index) => (
               <motion.article
                 key={service._id}
@@ -67,7 +67,7 @@ export function ServicesSection({
             ))}
           </div>
         ) : (
-          <div className={`${showHeading ? "mt-12" : ""} rounded-2xl border border-dashed border-border bg-card/60 p-8 text-sm leading-7 text-muted-foreground`}>
+          <div className={`${showHeading ? "mt-8 md:mt-12" : ""} rounded-2xl border border-dashed border-border bg-card/60 p-6 text-sm leading-7 text-muted-foreground sm:p-8`}>
             The hospital's service directory is maintained by administration and
             will appear here once published.
           </div>

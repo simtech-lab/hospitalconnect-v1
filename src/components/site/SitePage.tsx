@@ -31,7 +31,7 @@ export function SitePage({
       <main className="flex-1">
         <section className="relative overflow-hidden border-b border-border/70 bg-primary text-primary-foreground">
           <div className="ridge-pattern absolute inset-0 opacity-30" />
-          <div className="page-shell relative py-14 md:py-20">
+          <div className="page-shell relative py-10 sm:py-14 md:py-20">
             <nav
               aria-label="Breadcrumb"
               className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary-foreground/55"
@@ -43,12 +43,12 @@ export function SitePage({
               <span className="text-brand-soft">{eyebrow}</span>
             </nav>
 
-            <h1 className="mt-5 max-w-3xl font-display text-4xl leading-[1.03] tracking-tight text-balance sm:text-5xl lg:text-6xl">
+            <h1 className="mt-4 max-w-3xl font-display text-[2.15rem] leading-[1.03] tracking-tight text-balance sm:mt-5 sm:text-5xl lg:text-6xl">
               {title}
             </h1>
 
             {intro && (
-              <p className="mt-5 max-w-2xl text-sm leading-7 text-primary-foreground/70 sm:text-[15px] sm:leading-8">
+              <p className="mt-4 max-w-2xl text-sm leading-7 text-primary-foreground/70 sm:mt-5 sm:text-[15px] sm:leading-8">
                 {intro}
               </p>
             )}
